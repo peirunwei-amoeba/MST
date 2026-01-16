@@ -6,46 +6,75 @@
 //
 
 import SwiftUI
+import AVFoundation
 
 struct AssignmentRowView: View {
     let assignment: Assignment
+    let onToggleComplete: () -> Void
+    let onTap: () -> Void
 
     var body: some View {
         HStack(spacing: 12) {
-            // Completion indicator
-            Image(systemName: assignment.isCompleted ? "checkmark.circle.fill" : "circle")
-                .font(.title2)
-                .foregroundStyle(assignment.isCompleted ? .green : .secondary)
+            // Interactive completion checkbox with SF Symbol
+            Button {
+                if !assignment.isCompleted {
+                    // Haptic feedback
+                    let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                    impactFeedback.impactOccurred()
 
-            VStack(alignment: .leading, spacing: 4) {
-                // Title
-                Text(assignment.title)
-                    .font(.headline)
-                    .strikethrough(assignment.isCompleted)
-                    .foregroundStyle(assignment.isCompleted ? .secondary : .primary)
+                    // System sound
+                    AudioServicesPlaySystemSound(1407)
+                }
+                onToggleComplete()
+            } label: {
+                Image(systemName: assignment.isCompleted ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 26))
+                    .foregroundStyle(assignment.isCompleted ? .green : .secondary.opacity(0.5))
+                    .contentTransition(.symbolEffect(.replace.magic(fallback: .replace)))
+            }
+            .buttonStyle(.plain)
 
-                // Subject and due date
-                HStack(spacing: 8) {
-                    if !assignment.subject.isEmpty {
-                        Text(assignment.subject)
-                            .font(.caption)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color.blue.opacity(0.15))
-                            .foregroundStyle(.blue)
-                            .clipShape(Capsule())
+            // Tappable content area
+            Button {
+                onTap()
+            } label: {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        // Title
+                        Text(assignment.title)
+                            .font(.headline)
+                            .strikethrough(assignment.isCompleted)
+                            .foregroundStyle(assignment.isCompleted ? .secondary : .primary)
+
+                        // Subject and due date
+                        HStack(spacing: 8) {
+                            if !assignment.subject.isEmpty {
+                                Text(assignment.subject)
+                                    .font(.caption)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Color.blue.opacity(0.15))
+                                    .foregroundStyle(.blue)
+                                    .clipShape(Capsule())
+                            }
+
+                            Label(assignment.formattedDueDate, systemImage: "calendar")
+                                .font(.caption)
+                                .foregroundStyle(dueDateColor)
+                        }
                     }
 
-                    Label(assignment.formattedDueDate, systemImage: "calendar")
+                    Spacer()
+
+                    // Priority indicator
+                    priorityBadge
+
+                    Image(systemName: "chevron.right")
                         .font(.caption)
-                        .foregroundStyle(dueDateColor)
+                        .foregroundStyle(.tertiary)
                 }
             }
-
-            Spacer()
-
-            // Priority indicator
-            priorityBadge
+            .buttonStyle(.plain)
         }
         .padding(.vertical, 4)
     }
@@ -88,23 +117,35 @@ struct AssignmentRowView: View {
 
 #Preview {
     List {
-        AssignmentRowView(assignment: Assignment(
-            title: "Math Homework",
-            dueDate: Date().addingTimeInterval(86400),
-            priority: .high,
-            subject: "Mathematics"
-        ))
-        AssignmentRowView(assignment: Assignment(
-            title: "Essay Draft",
-            dueDate: Date(),
-            priority: .urgent,
-            subject: "English"
-        ))
-        AssignmentRowView(assignment: Assignment(
-            title: "Completed Task",
-            dueDate: Date(),
-            isCompleted: true,
-            subject: "History"
-        ))
+        AssignmentRowView(
+            assignment: Assignment(
+                title: "Math Homework",
+                dueDate: Date().addingTimeInterval(86400),
+                priority: .high,
+                subject: "Mathematics"
+            ),
+            onToggleComplete: {},
+            onTap: {}
+        )
+        AssignmentRowView(
+            assignment: Assignment(
+                title: "Essay Draft",
+                dueDate: Date(),
+                priority: .urgent,
+                subject: "English"
+            ),
+            onToggleComplete: {},
+            onTap: {}
+        )
+        AssignmentRowView(
+            assignment: Assignment(
+                title: "Completed Task",
+                dueDate: Date(),
+                isCompleted: true,
+                subject: "History"
+            ),
+            onToggleComplete: {},
+            onTap: {}
+        )
     }
 }
