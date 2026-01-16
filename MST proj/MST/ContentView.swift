@@ -6,19 +6,30 @@
 //
 
 import SwiftUI
+import SwiftData
 
 struct ContentView: View {
+    @EnvironmentObject private var themeManager: ThemeManager
+
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
+        TabView {
+            HomeView()
+                .tabItem {
+                    Label("Home", systemImage: "house.fill")
+                }
+
+            SettingsView()
+                .tabItem {
+                    Label("Settings", systemImage: "gearshape.fill")
+                }
         }
-        .padding()
+        .tint(themeManager.accentColor)
+        .preferredColorScheme(themeManager.colorScheme)
     }
 }
 
 #Preview {
     ContentView()
+        .modelContainer(for: Assignment.self, inMemory: true)
+        .environmentObject(ThemeManager())
 }

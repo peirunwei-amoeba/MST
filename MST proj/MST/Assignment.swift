@@ -1,0 +1,115 @@
+//
+//  Assignment.swift
+//  MST
+//
+//  Created by Runwei Pei on 12/1/26.
+//
+
+import Foundation
+import SwiftData
+
+@Model
+final class Assignment {
+    var title: String
+    var assignmentDescription: String
+    var dueDate: Date
+    var createdDate: Date
+    var isCompleted: Bool
+    var completedDate: Date?
+    var priority: Priority
+    var subject: String
+    var tags: [String]
+    var notes: String
+    var estimatedDuration: TimeInterval?
+    var notificationEnabled: Bool
+    var colorCode: String?
+
+    init(
+        title: String,
+        assignmentDescription: String = "",
+        dueDate: Date,
+        createdDate: Date = Date(),
+        isCompleted: Bool = false,
+        completedDate: Date? = nil,
+        priority: Priority = .medium,
+        subject: String = "",
+        tags: [String] = [],
+        notes: String = "",
+        estimatedDuration: TimeInterval? = nil,
+        notificationEnabled: Bool = true,
+        colorCode: String? = nil
+    ) {
+        self.title = title
+        self.assignmentDescription = assignmentDescription
+        self.dueDate = dueDate
+        self.createdDate = createdDate
+        self.isCompleted = isCompleted
+        self.completedDate = completedDate
+        self.priority = priority
+        self.subject = subject
+        self.tags = tags
+        self.notes = notes
+        self.estimatedDuration = estimatedDuration
+        self.notificationEnabled = notificationEnabled
+        self.colorCode = colorCode
+    }
+
+    // MARK: - Computed Properties
+
+    var isOverdue: Bool {
+        !isCompleted && dueDate < Date()
+    }
+
+    var isDueToday: Bool {
+        Calendar.current.isDateInToday(dueDate)
+    }
+
+    var isDueTomorrow: Bool {
+        Calendar.current.isDateInTomorrow(dueDate)
+    }
+
+    var timeUntilDue: TimeInterval {
+        dueDate.timeIntervalSinceNow
+    }
+
+    var formattedDueDate: String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter.string(from: dueDate)
+    }
+
+    // MARK: - Methods
+
+    func toggleCompletion() {
+        isCompleted.toggle()
+        completedDate = isCompleted ? Date() : nil
+    }
+}
+
+// MARK: - Priority Enum
+
+enum Priority: String, Codable, CaseIterable {
+    case low = "Low"
+    case medium = "Medium"
+    case high = "High"
+    case urgent = "Urgent"
+
+    var sortOrder: Int {
+        switch self {
+        case .urgent: return 0
+        case .high: return 1
+        case .medium: return 2
+        case .low: return 3
+        }
+    }
+
+    var color: String {
+        switch self {
+        case .urgent: return "red"
+        case .high: return "orange"
+        case .medium: return "yellow"
+        case .low: return "green"
+        }
+    }
+}
