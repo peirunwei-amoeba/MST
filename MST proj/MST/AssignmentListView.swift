@@ -79,13 +79,7 @@ struct AssignmentListView: View {
                 }
             }
             .sheet(isPresented: $showingAddSheet) {
-                AddAssignmentView { newAssignment in
-                    selectedAssignment = newAssignment
-                    // Small delay to allow the add sheet to dismiss
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        showingEditSheet = true
-                    }
-                }
+                AddAssignmentView()
             }
             .sheet(isPresented: $showingEditSheet) {
                 if let assignment = selectedAssignment {
@@ -105,31 +99,35 @@ struct AssignmentListView: View {
     private var assignmentList: some View {
         List {
             ForEach(filteredAndSortedAssignments) { assignment in
-                AssignmentRowView(assignment: assignment)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
+                AssignmentRowView(
+                    assignment: assignment,
+                    onToggleComplete: {
+                        toggleCompletionWithUndo(assignment)
+                    },
+                    onTap: {
                         selectedAssignment = assignment
                         showingEditSheet = true
                     }
-                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        Button(role: .destructive) {
-                            deleteAssignment(assignment)
-                        } label: {
-                            Label("Delete", systemImage: "trash")
+                )
+                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                    Button(role: .destructive) {
+                        deleteAssignment(assignment)
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                }
+                .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                    Button {
+                        toggleCompletionWithUndo(assignment)
+                    } label: {
+                        if assignment.isCompleted {
+                            Label("Mark Incomplete", systemImage: "arrow.uturn.backward")
+                        } else {
+                            Label("Complete", systemImage: "checkmark")
                         }
                     }
-                    .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                        Button {
-                            toggleCompletionWithUndo(assignment)
-                        } label: {
-                            if assignment.isCompleted {
-                                Label("Mark Incomplete", systemImage: "arrow.uturn.backward")
-                            } else {
-                                Label("Complete", systemImage: "checkmark")
-                            }
-                        }
-                        .tint(assignment.isCompleted ? .orange : .green)
-                    }
+                    .tint(assignment.isCompleted ? .orange : .green)
+                }
             }
         }
         .listStyle(.insetGrouped)

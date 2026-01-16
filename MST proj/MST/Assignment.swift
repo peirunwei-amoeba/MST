@@ -10,6 +10,7 @@ import SwiftData
 
 @Model
 final class Assignment {
+    @Attribute(.unique) var id: UUID
     var title: String
     var assignmentDescription: String
     var dueDate: Date
@@ -25,6 +26,7 @@ final class Assignment {
     var colorCode: String?
 
     init(
+        id: UUID = UUID(),
         title: String,
         assignmentDescription: String = "",
         dueDate: Date,
@@ -39,6 +41,7 @@ final class Assignment {
         notificationEnabled: Bool = true,
         colorCode: String? = nil
     ) {
+        self.id = id
         self.title = title
         self.assignmentDescription = assignmentDescription
         self.dueDate = dueDate
