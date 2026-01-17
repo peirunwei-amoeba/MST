@@ -40,7 +40,6 @@ struct AssignmentListView: View {
 
     @State private var showingAddSheet = false
     @State private var selectedAssignment: Assignment?
-    @State private var showingEditSheet = false
     @State private var sortOption: SortOption = .dueDate
     @State private var sortAscending = true
     @State private var filterOption: FilterOption = .all
@@ -81,10 +80,8 @@ struct AssignmentListView: View {
             .sheet(isPresented: $showingAddSheet) {
                 AddAssignmentView()
             }
-            .sheet(isPresented: $showingEditSheet) {
-                if let assignment = selectedAssignment {
-                    EditAssignmentView(assignment: assignment)
-                }
+            .sheet(item: $selectedAssignment) { assignment in
+                EditAssignmentView(assignment: assignment)
             }
             .overlay(alignment: .bottom) {
                 if showUndoToast {
@@ -106,7 +103,6 @@ struct AssignmentListView: View {
                     },
                     onTap: {
                         selectedAssignment = assignment
-                        showingEditSheet = true
                     }
                 )
                 .swipeActions(edge: .trailing, allowsFullSwipe: true) {
@@ -131,6 +127,7 @@ struct AssignmentListView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .animation(.easeInOut(duration: 0.35), value: filteredAndSortedAssignments.map { $0.id })
     }
 
     private var emptyStateView: some View {
@@ -280,8 +277,8 @@ struct AssignmentListView: View {
             result = result.filter { $0.isDueToday }
         }
 
-        // Apply sorting
-        result.sort { a, b in
+        // Helper function to compare assignments by selected sort option
+        func compareBySort(_ a: Assignment, _ b: Assignment) -> Bool {
             let comparison: Bool
             switch sortOption {
             case .dueDate:
@@ -298,7 +295,12 @@ struct AssignmentListView: View {
             return sortAscending ? comparison : !comparison
         }
 
-        return result
+        // Separate into uncompleted and completed groups
+        let uncompleted = result.filter { !$0.isCompleted }.sorted(by: compareBySort)
+        let completed = result.filter { $0.isCompleted }.sorted(by: compareBySort)
+
+        // Return uncompleted first, then completed
+        return uncompleted + completed
     }
 
     // MARK: - Actions
@@ -309,7 +311,10 @@ struct AssignmentListView: View {
 
     private func toggleCompletionWithUndo(_ assignment: Assignment) {
         let wasCompleted = assignment.isCompleted
-        assignment.toggleCompletion()
+
+        withAnimation(.easeInOut(duration: 0.35)) {
+            assignment.toggleCompletion()
+        }
 
         if !wasCompleted {
             // Just completed - show undo option
@@ -330,7 +335,9 @@ struct AssignmentListView: View {
 
     private func undoCompletion() {
         if let assignment = recentlyCompletedAssignment {
-            assignment.toggleCompletion()
+            withAnimation(.easeInOut(duration: 0.35)) {
+                assignment.toggleCompletion()
+            }
         }
         withAnimation {
             showUndoToast = false
