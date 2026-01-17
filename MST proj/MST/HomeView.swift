@@ -16,7 +16,6 @@ struct HomeView: View {
 
     @State private var showingAddSheet = false
     @State private var selectedAssignment: Assignment?
-    @State private var showingEditSheet = false
     @State private var showingAllAssignments = false
     @State private var recentlyCompletedIds: Set<UUID> = []
 
@@ -46,10 +45,8 @@ struct HomeView: View {
             .sheet(isPresented: $showingAddSheet) {
                 AddAssignmentView()
             }
-            .sheet(isPresented: $showingEditSheet) {
-                if let assignment = selectedAssignment {
-                    EditAssignmentView(assignment: assignment)
-                }
+            .sheet(item: $selectedAssignment) { assignment in
+                EditAssignmentView(assignment: assignment)
             }
             .sheet(isPresented: $showingAllAssignments) {
                 NavigationStack {
@@ -103,7 +100,6 @@ struct HomeView: View {
                             assignment: assignment,
                             onTap: {
                                 selectedAssignment = assignment
-                                showingEditSheet = true
                             },
                             onToggleComplete: {
                                 completeAssignmentWithDelay(assignment)
@@ -266,8 +262,8 @@ struct ConcentricAssignmentRow: View {
                 Button {
                     if !assignment.isCompleted {
                         // Trigger haptic feedback
-                        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-                        impactFeedback.impactOccurred()
+                        let feedbackGenerator = UINotificationFeedbackGenerator()
+                        feedbackGenerator.notificationOccurred(.success)
 
                         // Play system confirmation sound
                         AudioServicesPlaySystemSound(1407)

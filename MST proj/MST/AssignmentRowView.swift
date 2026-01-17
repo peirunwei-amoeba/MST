@@ -19,8 +19,8 @@ struct AssignmentRowView: View {
             Button {
                 if !assignment.isCompleted {
                     // Haptic feedback
-                    let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-                    impactFeedback.impactOccurred()
+                    let feedbackGenerator = UINotificationFeedbackGenerator()
+                    feedbackGenerator.notificationOccurred(.success)
 
                     // System sound
                     AudioServicesPlaySystemSound(1407)
