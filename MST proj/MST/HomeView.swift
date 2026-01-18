@@ -453,38 +453,74 @@ struct ConcentricProjectRow: View {
     private let maxVisibleGoals = 5
     private let dotSize: CGFloat = 20
     private let columnWidth: CGFloat = 48
+    private let mainCheckmarkSize: CGFloat = 28
+
+    // Next incomplete goal for the main checkmark and date display
+    private var nextGoal: Goal? {
+        project.nextGoal
+    }
+
+    // Date to display - next goal's target date, or project deadline if all complete
+    private var displayDate: String {
+        if let next = nextGoal {
+            return next.formattedTargetDate
+        }
+        return project.formattedDeadline
+    }
+
+    // Is the displayed date overdue?
+    private var isDisplayDateOverdue: Bool {
+        if let next = nextGoal {
+            return next.isOverdue
+        }
+        return project.isOverdue
+    }
 
     var body: some View {
         Button {
             onTap()
         } label: {
-            VStack(alignment: .leading, spacing: 10) {
-                // Project title row
-                HStack {
-                    Text(project.title)
-                        .font(.body.weight(.medium))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-
-                    Spacer()
-
-                    // Due date
-                    HStack(spacing: 3) {
-                        Image(systemName: "calendar")
-                            .font(.system(size: 10))
-                        Text(project.formattedDeadline)
-                            .font(.caption2.weight(.medium))
-                    }
-                    .foregroundStyle(project.isOverdue ? .red : .secondary)
-
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.tertiary)
+            HStack(spacing: 12) {
+                // Main checkmark button for next goal
+                Button {
+                    onToggleNextGoal()
+                } label: {
+                    Image(systemName: nextGoal != nil ? "circle" : "checkmark.circle.fill")
+                        .font(.system(size: mainCheckmarkSize))
+                        .foregroundStyle(nextGoal != nil ? Color.secondary.opacity(0.5) : Color.green)
+                        .contentTransition(.symbolEffect(.replace.magic(fallback: .replace)))
                 }
+                .buttonStyle(.plain)
+                .disabled(nextGoal == nil)
 
-                // Timeline with connected dots and title captions
-                if !project.goals.isEmpty {
-                    timelineView
+                VStack(alignment: .leading, spacing: 8) {
+                    // Project title row
+                    HStack {
+                        Text(project.title)
+                            .font(.body.weight(.medium))
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+
+                        Spacer()
+
+                        // Next goal's target date (or project deadline if all complete)
+                        HStack(spacing: 3) {
+                            Image(systemName: "calendar")
+                                .font(.system(size: 10))
+                            Text(displayDate)
+                                .font(.caption2.weight(.medium))
+                        }
+                        .foregroundStyle(isDisplayDateOverdue ? .red : .secondary)
+
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.tertiary)
+                    }
+
+                    // Timeline with connected dots and title captions
+                    if !project.goals.isEmpty {
+                        timelineView
+                    }
                 }
             }
             .padding(.horizontal, 14)
@@ -496,19 +532,27 @@ struct ConcentricProjectRow: View {
 
     private var timelineView: some View {
         let goals = Array(project.sortedGoals.prefix(maxVisibleGoals))
-        let completedCount = goals.filter { $0.isCompleted }.count
+
+        // Helper to check if all goals up to (and including) index are completed
+        func allCompletedUpTo(_ index: Int) -> Bool {
+            for i in 0...index {
+                if !goals[i].isCompleted { return false }
+            }
+            return true
+        }
 
         return ZStack(alignment: .topLeading) {
             // Connecting lines layer
             HStack(spacing: 0) {
                 ForEach(Array(goals.enumerated()), id: \.element.id) { index, goal in
                     if index > 0 {
-                        // Line connecting to previous dot
+                        // Line is green only if ALL goals before this one are completed
+                        let lineIsGreen = allCompletedUpTo(index - 1)
                         Rectangle()
-                            .fill(goals[index - 1].isCompleted ? Color.green : Color.secondary.opacity(0.3))
+                            .fill(lineIsGreen ? Color.green : Color.secondary.opacity(0.3))
                             .frame(height: 3)
                             .frame(width: columnWidth - dotSize)
-                            .animation(.easeInOut(duration: 0.5), value: goals[index - 1].isCompleted)
+                            .animation(.easeInOut(duration: 0.5), value: lineIsGreen)
                     }
 
                     // Spacer for the dot width
@@ -528,7 +572,7 @@ struct ConcentricProjectRow: View {
                             .foregroundStyle(goal.isCompleted ? .green : .secondary.opacity(0.5))
                             .contentTransition(.symbolEffect(.replace.magic(fallback: .replace)))
 
-                        // Title caption centered under dot
+                        // Title caption centered under dot (keep font size at 9)
                         Text(goal.title)
                             .font(.system(size: 9))
                             .foregroundStyle(goal.isCompleted ? .secondary : .primary)

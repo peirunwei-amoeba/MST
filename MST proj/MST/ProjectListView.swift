@@ -341,6 +341,19 @@ struct ProjectRowView: View {
 struct ProjectTimelinePreview: View {
     let project: Project
 
+    // Count consecutive completed goals from the start
+    private var consecutiveCompletedCount: Int {
+        var count = 0
+        for goal in project.sortedGoals {
+            if goal.isCompleted {
+                count += 1
+            } else {
+                break
+            }
+        }
+        return count
+    }
+
     var body: some View {
         if project.goals.isEmpty {
             Text("No goals defined")
@@ -351,6 +364,8 @@ struct ProjectTimelinePreview: View {
             GeometryReader { geometry in
                 let goals = Array(project.sortedGoals.prefix(5))
                 let dotSpacing = min(geometry.size.width / CGFloat(max(goals.count, 1)), 70)
+                let consecutiveCount = min(consecutiveCompletedCount, goals.count)
+                let progressWidth = consecutiveCount > 0 ? dotSpacing * CGFloat(consecutiveCount - 1) + 8 : 0
 
                 ZStack(alignment: .leading) {
                     // Background line (grey)
@@ -359,15 +374,12 @@ struct ProjectTimelinePreview: View {
                         .frame(width: dotSpacing * CGFloat(goals.count - 1) + 8, height: 3)
                         .offset(x: 4)
 
-                    // Progress line (green) - animates from left to right
-                    let completedCount = goals.filter { $0.isCompleted }.count
-                    let progressWidth = completedCount > 0 ? dotSpacing * CGFloat(completedCount - 1) + 8 : 0
-
+                    // Progress line (green) - only for consecutive completed goals from start
                     RoundedRectangle(cornerRadius: 2)
                         .fill(Color.green)
                         .frame(width: progressWidth, height: 3)
                         .offset(x: 4)
-                        .animation(.easeInOut(duration: 0.5), value: completedCount)
+                        .animation(.easeInOut(duration: 0.5), value: consecutiveCount)
 
                     // Dots with titles
                     HStack(spacing: 0) {

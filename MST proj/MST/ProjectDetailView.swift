@@ -84,13 +84,20 @@ struct ProjectDetailView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            // Deadline info
+            // Next goal date or project deadline
             HStack {
                 Image(systemName: "calendar")
                     .foregroundStyle(.secondary)
-                Text("Deadline: \(project.formattedDeadline)")
-                    .font(.subheadline)
-                    .foregroundStyle(project.isOverdue ? .red : .secondary)
+
+                if let nextGoal = project.nextGoal {
+                    Text("Next: \(nextGoal.formattedTargetDate)")
+                        .font(.subheadline)
+                        .foregroundStyle(nextGoal.isOverdue ? .red : .secondary)
+                } else {
+                    Text("Deadline: \(project.formattedDeadline)")
+                        .font(.subheadline)
+                        .foregroundStyle(project.isOverdue ? .red : .secondary)
+                }
 
                 Spacer()
 
@@ -196,17 +203,35 @@ struct HorizontalTimelineView: View {
     private let columnWidth: CGFloat = 90
     private let lineHeight: CGFloat = 4
 
+    // Helper to check if all goals up to (and including) index are completed
+    private func allCompletedUpTo(_ index: Int) -> Bool {
+        for i in 0...index {
+            if !goals[i].isCompleted { return false }
+        }
+        return true
+    }
+
+    // Check if a goal at index can be toggled (all previous must be complete, or it's already complete)
+    private func canToggle(at index: Int) -> Bool {
+        // Can always uncomplete (toggle off) a completed goal
+        if goals[index].isCompleted { return true }
+        // Can only complete if all previous goals are completed
+        if index == 0 { return true }
+        return allCompletedUpTo(index - 1)
+    }
+
     var body: some View {
         ZStack(alignment: .topLeading) {
             // Connecting lines layer
             HStack(spacing: 0) {
                 ForEach(Array(goals.enumerated()), id: \.element.id) { index, goal in
                     if index > 0 {
-                        // Line connecting to previous dot
+                        // Line is green only if ALL goals before this one are completed
+                        let lineIsGreen = allCompletedUpTo(index - 1)
                         Rectangle()
-                            .fill(goals[index - 1].isCompleted ? Color.green : Color.secondary.opacity(0.25))
+                            .fill(lineIsGreen ? Color.green : Color.secondary.opacity(0.25))
                             .frame(width: columnWidth - dotSize, height: lineHeight)
-                            .animation(.easeInOut(duration: 0.5), value: goals[index - 1].isCompleted)
+                            .animation(.easeInOut(duration: 0.5), value: lineIsGreen)
                     }
 
                     // Spacer for the dot width
@@ -218,11 +243,12 @@ struct HorizontalTimelineView: View {
 
             // Goals layer - dots with title and date
             HStack(alignment: .top, spacing: columnWidth - dotSize) {
-                ForEach(goals) { goal in
+                ForEach(Array(goals.enumerated()), id: \.element.id) { index, goal in
                     GoalColumnView(
                         goal: goal,
                         dotSize: dotSize,
                         columnWidth: columnWidth,
+                        isEnabled: canToggle(at: index),
                         onToggleComplete: {
                             onToggleComplete(goal)
                         }
@@ -239,6 +265,7 @@ struct GoalColumnView: View {
     let goal: Goal
     let dotSize: CGFloat
     let columnWidth: CGFloat
+    let isEnabled: Bool
     let onToggleComplete: () -> Void
 
     var body: some View {
@@ -249,15 +276,16 @@ struct GoalColumnView: View {
             } label: {
                 Image(systemName: goal.isCompleted ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: dotSize))
-                    .foregroundStyle(goal.isCompleted ? .green : .secondary.opacity(0.5))
+                    .foregroundStyle(goal.isCompleted ? .green : (isEnabled ? .secondary.opacity(0.5) : .secondary.opacity(0.25)))
                     .contentTransition(.symbolEffect(.replace.magic(fallback: .replace)))
             }
             .buttonStyle(.plain)
+            .disabled(!isEnabled)
 
             // Title
             Text(goal.title)
                 .font(.subheadline.weight(.medium))
-                .foregroundStyle(goal.isCompleted ? .secondary : .primary)
+                .foregroundStyle(goal.isCompleted ? .secondary : (isEnabled ? .primary : .secondary))
                 .lineLimit(2)
                 .multilineTextAlignment(.center)
                 .frame(width: columnWidth, alignment: .center)
@@ -267,25 +295,6 @@ struct GoalColumnView: View {
                 .font(.caption)
                 .foregroundStyle(goal.isOverdue && !goal.isCompleted ? .red : .secondary)
                 .frame(width: columnWidth, alignment: .center)
-
-            // Status badge
-            if goal.isCompleted {
-                Text("Done")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(Color.green)
-                    .clipShape(Capsule())
-            } else if goal.isOverdue {
-                Text("Overdue")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(Color.red)
-                    .clipShape(Capsule())
-            }
         }
         .frame(width: dotSize)
     }
