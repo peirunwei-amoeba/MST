@@ -23,6 +23,7 @@ struct HomeView: View {
     // Project-related state
     @State private var showingAddProjectSheet = false
     @State private var selectedProject: Project?
+    @State private var showingAllProjects = false
     @State private var recentlyCompletedGoalIds: Set<UUID> = []
 
     var body: some View {
@@ -67,6 +68,18 @@ struct HomeView: View {
                             ToolbarItem(placement: .cancellationAction) {
                                 Button("Done") {
                                     selectedProject = nil
+                                }
+                            }
+                        }
+                }
+            }
+            .sheet(isPresented: $showingAllProjects) {
+                NavigationStack {
+                    ProjectListView()
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button("Done") {
+                                    showingAllProjects = false
                                 }
                             }
                         }
@@ -278,6 +291,14 @@ struct HomeView: View {
                 Spacer()
 
                 Button {
+                    showingAllProjects = true
+                } label: {
+                    Text("See All")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(themeManager.accentColor)
+                }
+
+                Button {
                     showingAddProjectSheet = true
                 } label: {
                     Image(systemName: "plus")
@@ -429,67 +450,102 @@ struct ConcentricProjectRow: View {
 
     @EnvironmentObject private var themeManager: ThemeManager
 
+    private let maxVisibleGoals = 5
+    private let dotSize: CGFloat = 20
+    private let columnWidth: CGFloat = 48
+
     var body: some View {
         Button {
             onTap()
         } label: {
-            HStack(spacing: 14) {
-                // Completion button for next goal
-                Button {
-                    onToggleNextGoal()
-                } label: {
-                    Image(systemName: project.nextGoal != nil ? "circle" : "checkmark.circle.fill")
-                        .font(.system(size: 28))
-                        .foregroundStyle(project.nextGoal != nil ? Color.secondary.opacity(0.5) : Color.green)
-                        .contentTransition(.symbolEffect(.replace.magic(fallback: .replace)))
-                }
-                .buttonStyle(.plain)
-                .disabled(project.nextGoal == nil)
-
-                VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 10) {
+                // Project title row
+                HStack {
                     Text(project.title)
                         .font(.body.weight(.medium))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
 
-                    // Mini timeline dots
-                    HStack(spacing: 4) {
-                        ForEach(project.sortedGoals.prefix(7)) { goal in
-                            Circle()
-                                .fill(goal.isCompleted ? Color.green : Color.secondary.opacity(0.3))
-                                .frame(width: 8, height: 8)
-                        }
+                    Spacer()
 
-                        if project.goals.count > 7 {
-                            Text("+\(project.goals.count - 7)")
-                                .font(.system(size: 8, weight: .medium))
-                                .foregroundStyle(.secondary)
-                        }
-
-                        Spacer()
-
-                        // Due date
-                        HStack(spacing: 3) {
-                            Image(systemName: "calendar")
-                                .font(.system(size: 10))
-                            Text(project.formattedDeadline)
-                                .font(.caption2.weight(.medium))
-                        }
-                        .foregroundStyle(project.isOverdue ? .red : .secondary)
+                    // Due date
+                    HStack(spacing: 3) {
+                        Image(systemName: "calendar")
+                            .font(.system(size: 10))
+                        Text(project.formattedDeadline)
+                            .font(.caption2.weight(.medium))
                     }
+                    .foregroundStyle(project.isOverdue ? .red : .secondary)
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.tertiary)
                 }
 
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.tertiary)
+                // Timeline with connected dots and title captions
+                if !project.goals.isEmpty {
+                    timelineView
+                }
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+
+    private var timelineView: some View {
+        let goals = Array(project.sortedGoals.prefix(maxVisibleGoals))
+        let completedCount = goals.filter { $0.isCompleted }.count
+
+        return ZStack(alignment: .topLeading) {
+            // Connecting lines layer
+            HStack(spacing: 0) {
+                ForEach(Array(goals.enumerated()), id: \.element.id) { index, goal in
+                    if index > 0 {
+                        // Line connecting to previous dot
+                        Rectangle()
+                            .fill(goals[index - 1].isCompleted ? Color.green : Color.secondary.opacity(0.3))
+                            .frame(height: 3)
+                            .frame(width: columnWidth - dotSize)
+                            .animation(.easeInOut(duration: 0.5), value: goals[index - 1].isCompleted)
+                    }
+
+                    // Spacer for the dot width
+                    Color.clear
+                        .frame(width: dotSize, height: 3)
+                }
+            }
+            .padding(.top, (dotSize - 3) / 2)
+
+            // Dots and titles layer
+            HStack(alignment: .top, spacing: columnWidth - dotSize) {
+                ForEach(goals) { goal in
+                    VStack(spacing: 4) {
+                        // Checkmark dot
+                        Image(systemName: goal.isCompleted ? "checkmark.circle.fill" : "circle")
+                            .font(.system(size: dotSize))
+                            .foregroundStyle(goal.isCompleted ? .green : .secondary.opacity(0.5))
+                            .contentTransition(.symbolEffect(.replace.magic(fallback: .replace)))
+
+                        // Title caption centered under dot
+                        Text(goal.title)
+                            .font(.system(size: 9))
+                            .foregroundStyle(goal.isCompleted ? .secondary : .primary)
+                            .lineLimit(1)
+                            .frame(width: columnWidth, alignment: .center)
+                    }
+                    .frame(width: dotSize)
+                }
+
+                if project.goals.count > maxVisibleGoals {
+                    Text("+\(project.goals.count - maxVisibleGoals)")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 2)
+                }
+            }
+        }
     }
 }
 

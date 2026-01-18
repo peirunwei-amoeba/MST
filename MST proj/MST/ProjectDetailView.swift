@@ -123,18 +123,15 @@ struct ProjectDetailView: View {
             if project.goals.isEmpty {
                 emptyGoalsView
             } else {
-                VStack(spacing: 0) {
-                    ForEach(Array(project.sortedGoals.enumerated()), id: \.element.id) { index, goal in
-                        GoalTimelineRow(
-                            goal: goal,
-                            isLast: index == project.goals.count - 1,
-                            onToggleComplete: {
-                                toggleGoalCompletion(goal)
-                            }
-                        )
-                    }
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HorizontalTimelineView(
+                        goals: project.sortedGoals,
+                        onToggleComplete: { goal in
+                            toggleGoalCompletion(goal)
+                        }
+                    )
+                    .padding(20)
                 }
-                .padding(16)
                 .background {
                     RoundedRectangle(cornerRadius: 20, style: .continuous)
                         .fill(.ultraThinMaterial)
@@ -189,64 +186,108 @@ struct ProjectDetailView: View {
     }
 }
 
-// MARK: - Goal Timeline Row
+// MARK: - Horizontal Timeline View
 
-struct GoalTimelineRow: View {
-    let goal: Goal
-    let isLast: Bool
-    let onToggleComplete: () -> Void
+struct HorizontalTimelineView: View {
+    let goals: [Goal]
+    let onToggleComplete: (Goal) -> Void
 
-    @EnvironmentObject private var themeManager: ThemeManager
+    private let dotSize: CGFloat = 36
+    private let columnWidth: CGFloat = 90
+    private let lineHeight: CGFloat = 4
 
     var body: some View {
-        HStack(alignment: .top, spacing: 16) {
-            // Timeline indicator with connecting line
-            VStack(spacing: 0) {
-                Button {
-                    onToggleComplete()
-                } label: {
-                    Image(systemName: goal.isCompleted ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 24))
-                        .foregroundStyle(goal.isCompleted ? .green : .secondary.opacity(0.5))
-                        .contentTransition(.symbolEffect(.replace.magic(fallback: .replace)))
-                }
-                .buttonStyle(.plain)
-
-                if !isLast {
-                    Rectangle()
-                        .fill(goal.isCompleted ? Color.green.opacity(0.5) : Color.secondary.opacity(0.2))
-                        .frame(width: 2)
-                        .frame(minHeight: 40)
-                }
-            }
-
-            // Goal content
-            VStack(alignment: .leading, spacing: 4) {
-                Text(goal.title)
-                    .font(.body.weight(.medium))
-                    .foregroundStyle(goal.isCompleted ? .secondary : .primary)
-                    .strikethrough(goal.isCompleted, color: .secondary)
-
-                HStack(spacing: 8) {
-                    Text(goal.formattedTargetDate)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    if goal.isCompleted {
-                        Image(systemName: "checkmark")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.green)
-                    } else if goal.isOverdue {
-                        Text("Overdue")
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(.red)
+        ZStack(alignment: .topLeading) {
+            // Connecting lines layer
+            HStack(spacing: 0) {
+                ForEach(Array(goals.enumerated()), id: \.element.id) { index, goal in
+                    if index > 0 {
+                        // Line connecting to previous dot
+                        Rectangle()
+                            .fill(goals[index - 1].isCompleted ? Color.green : Color.secondary.opacity(0.25))
+                            .frame(width: columnWidth - dotSize, height: lineHeight)
+                            .animation(.easeInOut(duration: 0.5), value: goals[index - 1].isCompleted)
                     }
+
+                    // Spacer for the dot width
+                    Color.clear
+                        .frame(width: dotSize, height: lineHeight)
                 }
             }
-            .padding(.bottom, isLast ? 0 : 20)
+            .padding(.top, (dotSize - lineHeight) / 2)
 
-            Spacer()
+            // Goals layer - dots with title and date
+            HStack(alignment: .top, spacing: columnWidth - dotSize) {
+                ForEach(goals) { goal in
+                    GoalColumnView(
+                        goal: goal,
+                        dotSize: dotSize,
+                        columnWidth: columnWidth,
+                        onToggleComplete: {
+                            onToggleComplete(goal)
+                        }
+                    )
+                }
+            }
         }
+    }
+}
+
+// MARK: - Goal Column View
+
+struct GoalColumnView: View {
+    let goal: Goal
+    let dotSize: CGFloat
+    let columnWidth: CGFloat
+    let onToggleComplete: () -> Void
+
+    var body: some View {
+        VStack(spacing: 8) {
+            // Big checkmark button
+            Button {
+                onToggleComplete()
+            } label: {
+                Image(systemName: goal.isCompleted ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: dotSize))
+                    .foregroundStyle(goal.isCompleted ? .green : .secondary.opacity(0.5))
+                    .contentTransition(.symbolEffect(.replace.magic(fallback: .replace)))
+            }
+            .buttonStyle(.plain)
+
+            // Title
+            Text(goal.title)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(goal.isCompleted ? .secondary : .primary)
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+                .frame(width: columnWidth, alignment: .center)
+
+            // Date
+            Text(goal.formattedTargetDate)
+                .font(.caption)
+                .foregroundStyle(goal.isOverdue && !goal.isCompleted ? .red : .secondary)
+                .frame(width: columnWidth, alignment: .center)
+
+            // Status badge
+            if goal.isCompleted {
+                Text("Done")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Color.green)
+                    .clipShape(Capsule())
+            } else if goal.isOverdue {
+                Text("Overdue")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Color.red)
+                    .clipShape(Capsule())
+            }
+        }
+        .frame(width: dotSize)
     }
 }
 
