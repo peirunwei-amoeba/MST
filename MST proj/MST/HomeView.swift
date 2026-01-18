@@ -33,15 +33,6 @@ struct HomeView: View {
             }
             .background(themeManager.backgroundColor)
             .navigationTitle("Welcome")
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        showingAddSheet = true
-                    } label: {
-                        Image(systemName: "plus")
-                    }
-                }
-            }
             .sheet(isPresented: $showingAddSheet) {
                 AddAssignmentView()
             }
@@ -81,6 +72,17 @@ struct HomeView: View {
                     Text("See All")
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(themeManager.accentColor)
+                }
+
+                Button {
+                    showingAddSheet = true
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(themeManager.accentColor)
+                        .padding(12)
+                        .glassEffect(.regular)
+                        .clipShape(Circle())
                 }
             }
             .padding(.horizontal, 4)
