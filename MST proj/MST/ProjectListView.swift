@@ -343,47 +343,55 @@ struct ProjectRowView: View {
 
     private var timelineView: some View {
         let goals = Array(project.sortedGoals.prefix(maxVisibleGoals))
-        let lineWidth: CGFloat = 24
+        let lineWidth: CGFloat = columnWidth - dotSize
 
-        return HStack(alignment: .top, spacing: 0) {
-            ForEach(Array(goals.enumerated()), id: \.element.id) { index, goal in
-                // Line before this goal (except first)
-                if index > 0 {
-                    Rectangle()
-                        .fill(goal.isCompleted ? Color.green : Color.secondary.opacity(0.3))
-                        .frame(width: lineWidth, height: 3)
-                        .padding(.top, (dotSize - 3) / 2)
-                        .animation(.easeInOut(duration: 0.5), value: goal.isCompleted)
-                }
-
-                // Checkmark + Title as a vertical unit
-                VStack(spacing: 4) {
-                    Button {
-                        toggleGoal(goal, at: index, in: goals)
-                    } label: {
-                        Image(systemName: goal.isCompleted ? "checkmark.circle.fill" : "circle")
-                            .font(.system(size: dotSize))
-                            .foregroundStyle(goal.isCompleted ? .green : canToggle(index, in: goals) ? .secondary.opacity(0.5) : .secondary.opacity(0.25))
-                            .contentTransition(.symbolEffect(.replace.magic(fallback: .replace)))
+        return ZStack(alignment: .topLeading) {
+            // Lines layer - connects checkmark centers
+            HStack(spacing: 0) {
+                ForEach(Array(goals.enumerated()), id: \.element.id) { index, goal in
+                    if index > 0 {
+                        Rectangle()
+                            .fill(goal.isCompleted ? Color.green : Color.secondary.opacity(0.3))
+                            .frame(width: lineWidth, height: 3)
+                            .animation(.easeInOut(duration: 0.5), value: goal.isCompleted)
                     }
-                    .buttonStyle(.plain)
-                    .disabled(!canToggle(index, in: goals))
-
-                    Text(goal.title)
-                        .font(.system(size: 9))
-                        .foregroundStyle(goal.isCompleted ? .secondary : .primary)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.center)
-                        .frame(width: columnWidth)
+                    Color.clear
+                        .frame(width: dotSize, height: 3)
                 }
             }
+            .padding(.top, (dotSize - 3) / 2)
 
-            if project.goals.count > maxVisibleGoals {
-                Text("+\(project.goals.count - maxVisibleGoals)")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(.secondary)
-                    .padding(.leading, 8)
-                    .padding(.top, (dotSize - 10) / 2)
+            // Goals layer - checkmarks with titles
+            HStack(alignment: .top, spacing: lineWidth) {
+                ForEach(Array(goals.enumerated()), id: \.element.id) { index, goal in
+                    VStack(spacing: 4) {
+                        Button {
+                            toggleGoal(goal, at: index, in: goals)
+                        } label: {
+                            Image(systemName: goal.isCompleted ? "checkmark.circle.fill" : "circle")
+                                .font(.system(size: dotSize))
+                                .foregroundStyle(goal.isCompleted ? .green : canToggle(index, in: goals) ? .secondary.opacity(0.5) : .secondary.opacity(0.25))
+                                .contentTransition(.symbolEffect(.replace.magic(fallback: .replace)))
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(!canToggle(index, in: goals))
+
+                        Text(goal.title)
+                            .font(.system(size: 9))
+                            .foregroundStyle(goal.isCompleted ? .secondary : .primary)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.center)
+                            .frame(width: columnWidth)
+                    }
+                    .frame(width: dotSize)
+                }
+
+                if project.goals.count > maxVisibleGoals {
+                    Text("+\(project.goals.count - maxVisibleGoals)")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .padding(.top, (dotSize - 10) / 2)
+                }
             }
         }
     }
