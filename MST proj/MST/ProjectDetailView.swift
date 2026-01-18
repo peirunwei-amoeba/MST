@@ -203,21 +203,16 @@ struct HorizontalTimelineView: View {
     private let columnWidth: CGFloat = 90
     private let lineHeight: CGFloat = 4
 
-    // Helper to check if all goals up to (and including) index are completed
-    private func allCompletedUpTo(_ index: Int) -> Bool {
-        for i in 0...index {
-            if !goals[i].isCompleted { return false }
-        }
-        return true
-    }
-
     // Check if a goal at index can be toggled (all previous must be complete, or it's already complete)
     private func canToggle(at index: Int) -> Bool {
         // Can always uncomplete (toggle off) a completed goal
         if goals[index].isCompleted { return true }
         // Can only complete if all previous goals are completed
         if index == 0 { return true }
-        return allCompletedUpTo(index - 1)
+        for i in 0..<index {
+            if !goals[i].isCompleted { return false }
+        }
+        return true
     }
 
     var body: some View {
@@ -226,8 +221,8 @@ struct HorizontalTimelineView: View {
             HStack(spacing: 0) {
                 ForEach(Array(goals.enumerated()), id: \.element.id) { index, goal in
                     if index > 0 {
-                        // Line is green only if ALL goals before this one are completed
-                        let lineIsGreen = allCompletedUpTo(index - 1)
+                        // Line is green when THIS goal (the one after the line) is completed
+                        let lineIsGreen = goal.isCompleted
                         Rectangle()
                             .fill(lineIsGreen ? Color.green : Color.secondary.opacity(0.25))
                             .frame(width: columnWidth - dotSize, height: lineHeight)
@@ -282,13 +277,14 @@ struct GoalColumnView: View {
             .buttonStyle(.plain)
             .disabled(!isEnabled)
 
-            // Title
+            // Title - allow 2 lines with dynamic width
             Text(goal.title)
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(goal.isCompleted ? .secondary : (isEnabled ? .primary : .secondary))
                 .lineLimit(2)
                 .multilineTextAlignment(.center)
-                .frame(width: columnWidth, alignment: .center)
+                .frame(width: columnWidth + 10, alignment: .center)
+                .fixedSize(horizontal: false, vertical: true)
 
             // Date
             Text(goal.formattedTargetDate)

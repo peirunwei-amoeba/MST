@@ -533,21 +533,13 @@ struct ConcentricProjectRow: View {
     private var timelineView: some View {
         let goals = Array(project.sortedGoals.prefix(maxVisibleGoals))
 
-        // Helper to check if all goals up to (and including) index are completed
-        func allCompletedUpTo(_ index: Int) -> Bool {
-            for i in 0...index {
-                if !goals[i].isCompleted { return false }
-            }
-            return true
-        }
-
         return ZStack(alignment: .topLeading) {
             // Connecting lines layer
             HStack(spacing: 0) {
                 ForEach(Array(goals.enumerated()), id: \.element.id) { index, goal in
                     if index > 0 {
-                        // Line is green only if ALL goals before this one are completed
-                        let lineIsGreen = allCompletedUpTo(index - 1)
+                        // Line is green when THIS goal (the one after the line) is completed
+                        let lineIsGreen = goal.isCompleted
                         Rectangle()
                             .fill(lineIsGreen ? Color.green : Color.secondary.opacity(0.3))
                             .frame(height: 3)
@@ -572,12 +564,14 @@ struct ConcentricProjectRow: View {
                             .foregroundStyle(goal.isCompleted ? .green : .secondary.opacity(0.5))
                             .contentTransition(.symbolEffect(.replace.magic(fallback: .replace)))
 
-                        // Title caption centered under dot (keep font size at 9)
+                        // Title caption centered under dot - allow 2 lines
                         Text(goal.title)
                             .font(.system(size: 9))
                             .foregroundStyle(goal.isCompleted ? .secondary : .primary)
-                            .lineLimit(1)
-                            .frame(width: columnWidth, alignment: .center)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.center)
+                            .frame(width: columnWidth + 8, alignment: .center)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     .frame(width: dotSize)
                 }

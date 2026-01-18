@@ -341,19 +341,6 @@ struct ProjectRowView: View {
 struct ProjectTimelinePreview: View {
     let project: Project
 
-    // Count consecutive completed goals from the start
-    private var consecutiveCompletedCount: Int {
-        var count = 0
-        for goal in project.sortedGoals {
-            if goal.isCompleted {
-                count += 1
-            } else {
-                break
-            }
-        }
-        return count
-    }
-
     var body: some View {
         if project.goals.isEmpty {
             Text("No goals defined")
@@ -364,22 +351,25 @@ struct ProjectTimelinePreview: View {
             GeometryReader { geometry in
                 let goals = Array(project.sortedGoals.prefix(5))
                 let dotSpacing = min(geometry.size.width / CGFloat(max(goals.count, 1)), 70)
-                let consecutiveCount = min(consecutiveCompletedCount, goals.count)
-                let progressWidth = consecutiveCount > 0 ? dotSpacing * CGFloat(consecutiveCount - 1) + 8 : 0
 
                 ZStack(alignment: .leading) {
-                    // Background line (grey)
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(Color.secondary.opacity(0.3))
-                        .frame(width: dotSpacing * CGFloat(goals.count - 1) + 8, height: 3)
-                        .offset(x: 4)
+                    // Lines between dots
+                    HStack(spacing: 0) {
+                        ForEach(Array(goals.enumerated()), id: \.element.id) { index, goal in
+                            if index > 0 {
+                                // Line is green when THIS goal is completed
+                                Rectangle()
+                                    .fill(goal.isCompleted ? Color.green : Color.secondary.opacity(0.3))
+                                    .frame(width: dotSpacing - 10, height: 3)
+                                    .animation(.easeInOut(duration: 0.5), value: goal.isCompleted)
+                            }
 
-                    // Progress line (green) - only for consecutive completed goals from start
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(Color.green)
-                        .frame(width: progressWidth, height: 3)
-                        .offset(x: 4)
-                        .animation(.easeInOut(duration: 0.5), value: consecutiveCount)
+                            // Spacer for dot
+                            Color.clear
+                                .frame(width: 10, height: 3)
+                        }
+                    }
+                    .offset(x: 4, y: 3.5)
 
                     // Dots with titles
                     HStack(spacing: 0) {
@@ -396,8 +386,9 @@ struct ProjectTimelinePreview: View {
                                 Text(goal.title)
                                     .font(.system(size: 8))
                                     .foregroundStyle(goal.isCompleted ? .secondary : .primary)
-                                    .lineLimit(1)
-                                    .frame(width: dotSpacing - 4)
+                                    .lineLimit(2)
+                                    .multilineTextAlignment(.center)
+                                    .frame(width: dotSpacing, alignment: .center)
                             }
                             .frame(width: dotSpacing)
                         }
@@ -411,7 +402,7 @@ struct ProjectTimelinePreview: View {
                     }
                 }
             }
-            .frame(height: 36)
+            .frame(height: 48)
         }
     }
 }
