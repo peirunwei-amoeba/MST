@@ -339,6 +339,7 @@ struct ProjectRowView: View {
             .padding(.vertical, 4)
         }
         .buttonStyle(.plain)
+    
     }
 
     private var timelineView: some View {
