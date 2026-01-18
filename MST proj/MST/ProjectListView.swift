@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import AVFoundation
 
 enum ProjectSortOption: String, CaseIterable {
     case deadline = "Deadline"
@@ -284,7 +285,12 @@ struct ProjectRowView: View {
     let project: Project
     let onTap: () -> Void
 
+    @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var themeManager: ThemeManager
+
+    private let maxVisibleGoals = 5
+    private let dotSize: CGFloat = 22
+    private let columnWidth: CGFloat = 56
 
     var body: some View {
         Button {
@@ -308,19 +314,19 @@ struct ProjectRowView: View {
                     }
                 }
 
-                // Timeline with connected dots and titles
-                ProjectTimelinePreview(project: project)
+                // Timeline with interactive checkmarks
+                if !project.goals.isEmpty {
+                    timelineView
+                }
 
                 // Progress and deadline
                 HStack {
-                    // Progress
                     Text("\(project.completedGoalsCount)/\(project.goals.count) goals")
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
                     Spacer()
 
-                    // Deadline
                     HStack(spacing: 4) {
                         Image(systemName: "calendar")
                             .font(.caption2)
@@ -334,75 +340,74 @@ struct ProjectRowView: View {
         }
         .buttonStyle(.plain)
     }
-}
 
-// MARK: - Project Timeline Preview (with connected dots and titles)
+    private var timelineView: some View {
+        let goals = Array(project.sortedGoals.prefix(maxVisibleGoals))
+        let lineWidth: CGFloat = 24
 
-struct ProjectTimelinePreview: View {
-    let project: Project
+        return HStack(alignment: .top, spacing: 0) {
+            ForEach(Array(goals.enumerated()), id: \.element.id) { index, goal in
+                // Line before this goal (except first)
+                if index > 0 {
+                    Rectangle()
+                        .fill(goal.isCompleted ? Color.green : Color.secondary.opacity(0.3))
+                        .frame(width: lineWidth, height: 3)
+                        .padding(.top, (dotSize - 3) / 2)
+                        .animation(.easeInOut(duration: 0.5), value: goal.isCompleted)
+                }
 
-    var body: some View {
-        if project.goals.isEmpty {
-            Text("No goals defined")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .italic()
-        } else {
-            GeometryReader { geometry in
-                let goals = Array(project.sortedGoals.prefix(5))
-                let dotSpacing = min(geometry.size.width / CGFloat(max(goals.count, 1)), 70)
-
-                ZStack(alignment: .leading) {
-                    // Lines between dots
-                    HStack(spacing: 0) {
-                        ForEach(Array(goals.enumerated()), id: \.element.id) { index, goal in
-                            if index > 0 {
-                                // Line is green when THIS goal is completed
-                                Rectangle()
-                                    .fill(goal.isCompleted ? Color.green : Color.secondary.opacity(0.3))
-                                    .frame(width: dotSpacing - 10, height: 3)
-                                    .animation(.easeInOut(duration: 0.5), value: goal.isCompleted)
-                            }
-
-                            // Spacer for dot
-                            Color.clear
-                                .frame(width: 10, height: 3)
-                        }
+                // Checkmark + Title as a vertical unit
+                VStack(spacing: 4) {
+                    Button {
+                        toggleGoal(goal, at: index, in: goals)
+                    } label: {
+                        Image(systemName: goal.isCompleted ? "checkmark.circle.fill" : "circle")
+                            .font(.system(size: dotSize))
+                            .foregroundStyle(goal.isCompleted ? .green : canToggle(index, in: goals) ? .secondary.opacity(0.5) : .secondary.opacity(0.25))
+                            .contentTransition(.symbolEffect(.replace.magic(fallback: .replace)))
                     }
-                    .offset(x: 4, y: 3.5)
+                    .buttonStyle(.plain)
+                    .disabled(!canToggle(index, in: goals))
 
-                    // Dots with titles
-                    HStack(spacing: 0) {
-                        ForEach(Array(goals.enumerated()), id: \.element.id) { index, goal in
-                            VStack(spacing: 4) {
-                                Circle()
-                                    .fill(goal.isCompleted ? Color.green : Color.secondary.opacity(0.4))
-                                    .frame(width: 10, height: 10)
-                                    .overlay(
-                                        Circle()
-                                            .strokeBorder(goal.isCompleted ? Color.green : Color.secondary.opacity(0.6), lineWidth: 1)
-                                    )
-
-                                Text(goal.title)
-                                    .font(.system(size: 8))
-                                    .foregroundStyle(goal.isCompleted ? .secondary : .primary)
-                                    .lineLimit(2)
-                                    .multilineTextAlignment(.center)
-                                    .frame(width: dotSpacing, alignment: .center)
-                            }
-                            .frame(width: dotSpacing)
-                        }
-
-                        if project.goals.count > 5 {
-                            Text("+\(project.goals.count - 5)")
-                                .font(.system(size: 9, weight: .medium))
-                                .foregroundStyle(.secondary)
-                                .padding(.leading, 4)
-                        }
-                    }
+                    Text(goal.title)
+                        .font(.system(size: 9))
+                        .foregroundStyle(goal.isCompleted ? .secondary : .primary)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.center)
+                        .frame(width: columnWidth)
                 }
             }
-            .frame(height: 48)
+
+            if project.goals.count > maxVisibleGoals {
+                Text("+\(project.goals.count - maxVisibleGoals)")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .padding(.leading, 8)
+                    .padding(.top, (dotSize - 10) / 2)
+            }
+        }
+    }
+
+    private func canToggle(_ index: Int, in goals: [Goal]) -> Bool {
+        if goals[index].isCompleted { return true }
+        if index == 0 { return true }
+        for i in 0..<index {
+            if !goals[i].isCompleted { return false }
+        }
+        return true
+    }
+
+    private func toggleGoal(_ goal: Goal, at index: Int, in goals: [Goal]) {
+        guard canToggle(index, in: goals) else { return }
+
+        if !goal.isCompleted {
+            let feedbackGenerator = UINotificationFeedbackGenerator()
+            feedbackGenerator.notificationOccurred(.success)
+            AudioServicesPlaySystemSound(1407)
+        }
+
+        withAnimation {
+            goal.toggleCompletion()
         }
     }
 }
