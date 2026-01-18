@@ -93,6 +93,7 @@ final class Assignment {
 // MARK: - Priority Enum
 
 enum Priority: String, Codable, CaseIterable {
+    case none = "Default"
     case low = "Low"
     case medium = "Medium"
     case high = "High"
@@ -104,6 +105,7 @@ enum Priority: String, Codable, CaseIterable {
         case .high: return 1
         case .medium: return 2
         case .low: return 3
+        case .none: return 4
         }
     }
 
@@ -113,6 +115,7 @@ enum Priority: String, Codable, CaseIterable {
         case .high: return "orange"
         case .medium: return "yellow"
         case .low: return "green"
+        case .none: return "gray"
         }
     }
 }

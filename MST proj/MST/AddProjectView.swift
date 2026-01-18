@@ -14,6 +14,7 @@ struct AddProjectView: View {
 
     @State private var title = ""
     @State private var projectDescription = ""
+    @State private var subject = ""
     @State private var deadline = Calendar.current.date(byAdding: .month, value: 1, to: Date()) ?? Date()
     @State private var goalEntries: [GoalEntry] = []
 
@@ -21,6 +22,7 @@ struct AddProjectView: View {
         let id = UUID()
         var title: String
         var targetDate: Date
+        var priority: Priority = .none
     }
 
     var body: some View {
@@ -28,6 +30,8 @@ struct AddProjectView: View {
             Form {
                 Section("Project Details") {
                     TextField("Title", text: $title)
+
+                    TextField("Subject (optional)", text: $subject)
 
                     TextField("Description", text: $projectDescription, axis: .vertical)
                         .lineLimit(3...6)
@@ -41,7 +45,25 @@ struct AddProjectView: View {
                     ForEach($goalEntries) { $entry in
                         VStack(alignment: .leading, spacing: 8) {
                             TextField("Goal title", text: $entry.title)
-                            DatePicker("Target date", selection: $entry.targetDate, displayedComponents: .date)
+                            HStack {
+                                DatePicker("Target", selection: $entry.targetDate, displayedComponents: .date)
+                                    .labelsHidden()
+
+                                Spacer()
+
+                                Picker("Priority", selection: $entry.priority) {
+                                    ForEach(Priority.allCases, id: \.self) { priority in
+                                        HStack {
+                                            Circle()
+                                                .fill(priorityColor(for: priority))
+                                                .frame(width: 10, height: 10)
+                                            Text(priority.rawValue)
+                                        }
+                                        .tag(priority)
+                                    }
+                                }
+                                .pickerStyle(.menu)
+                            }
                         }
                         .padding(.vertical, 4)
                     }
@@ -98,11 +120,22 @@ struct AddProjectView: View {
         goalEntries.move(fromOffsets: source, toOffset: destination)
     }
 
+    private func priorityColor(for priority: Priority) -> Color {
+        switch priority {
+        case .none: return .gray
+        case .low: return .green
+        case .medium: return .blue
+        case .high: return .orange
+        case .urgent: return .red
+        }
+    }
+
     private func addProject() {
         let project = Project(
             title: title.trimmingCharacters(in: .whitespaces),
             projectDescription: projectDescription,
-            deadline: deadline
+            deadline: deadline,
+            subject: subject.trimmingCharacters(in: .whitespaces)
         )
 
         // Create goals from entries
@@ -112,6 +145,7 @@ struct AddProjectView: View {
                     title: entry.title.trimmingCharacters(in: .whitespaces),
                     targetDate: entry.targetDate,
                     sortOrder: index,
+                    priority: entry.priority,
                     project: project
                 )
                 project.goals.append(goal)

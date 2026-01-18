@@ -12,6 +12,7 @@ import AVFoundation
 enum ProjectSortOption: String, CaseIterable {
     case deadline = "Deadline"
     case title = "Title"
+    case subject = "Subject"
     case progress = "Progress"
     case createdDate = "Created Date"
 
@@ -19,6 +20,7 @@ enum ProjectSortOption: String, CaseIterable {
         switch self {
         case .deadline: return "calendar"
         case .title: return "textformat"
+        case .subject: return "folder"
         case .progress: return "chart.bar"
         case .createdDate: return "clock"
         }
@@ -232,7 +234,8 @@ struct ProjectListView: View {
         if !searchText.isEmpty {
             result = result.filter { project in
                 project.title.localizedCaseInsensitiveContains(searchText) ||
-                project.projectDescription.localizedCaseInsensitiveContains(searchText)
+                project.projectDescription.localizedCaseInsensitiveContains(searchText) ||
+                project.subject.localizedCaseInsensitiveContains(searchText)
             }
         }
 
@@ -256,6 +259,15 @@ struct ProjectListView: View {
                 comparison = a.deadline < b.deadline
             case .title:
                 comparison = a.title.localizedCaseInsensitiveCompare(b.title) == .orderedAscending
+            case .subject:
+                // Empty subjects sort last
+                if a.subject.isEmpty && !b.subject.isEmpty {
+                    return !sortAscending
+                }
+                if !a.subject.isEmpty && b.subject.isEmpty {
+                    return sortAscending
+                }
+                comparison = a.subject.localizedCaseInsensitiveCompare(b.subject) == .orderedAscending
             case .progress:
                 comparison = a.progressPercentage < b.progressPercentage
             case .createdDate:
@@ -292,6 +304,22 @@ struct ProjectRowView: View {
     private let dotSize: CGFloat = 22
     private let columnWidth: CGFloat = 56
 
+    // Date to display - next goal's target date, or project deadline if all complete
+    private var displayDate: String {
+        if let next = project.nextGoal {
+            return next.formattedTargetDate
+        }
+        return project.formattedDeadline
+    }
+
+    // Is the displayed date overdue?
+    private var isDisplayDateOverdue: Bool {
+        if let next = project.nextGoal {
+            return next.isOverdue
+        }
+        return project.isOverdue
+    }
+
     var body: some View {
         Button {
             onTap()
@@ -302,6 +330,17 @@ struct ProjectRowView: View {
                     Text(project.title)
                         .font(.headline)
                         .foregroundStyle(project.isCompleted ? .secondary : .primary)
+
+                    // Subject pill
+                    if !project.subject.isEmpty {
+                        Text(project.subject)
+                            .font(.caption2.weight(.medium))
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
+                            .background(themeManager.accentColor.opacity(0.12))
+                            .foregroundStyle(themeManager.accentColor)
+                            .clipShape(Capsule())
+                    }
 
                     Spacer()
 
@@ -330,10 +369,10 @@ struct ProjectRowView: View {
                     HStack(spacing: 4) {
                         Image(systemName: "calendar")
                             .font(.caption2)
-                        Text(project.formattedDeadline)
+                        Text(displayDate)
                             .font(.caption)
                     }
-                    .foregroundStyle(project.isOverdue ? .red : .secondary)
+                    .foregroundStyle(isDisplayDateOverdue ? .red : .secondary)
                 }
             }
             .padding(.vertical, 4)
@@ -371,7 +410,7 @@ struct ProjectRowView: View {
                         } label: {
                             Image(systemName: goal.isCompleted ? "checkmark.circle.fill" : "circle")
                                 .font(.system(size: dotSize))
-                                .foregroundStyle(goal.isCompleted ? .green : canToggle(index, in: goals) ? .secondary.opacity(0.5) : .secondary.opacity(0.25))
+                                .foregroundStyle(goal.isCompleted ? .green : canToggle(index, in: goals) ? goalPriorityColor(goal) : goalPriorityColor(goal).opacity(0.4))
                                 .contentTransition(.symbolEffect(.replace.magic(fallback: .replace)))
                         }
                         .buttonStyle(.plain)
@@ -417,6 +456,16 @@ struct ProjectRowView: View {
 
         withAnimation {
             goal.toggleCompletion()
+        }
+    }
+
+    private func goalPriorityColor(_ goal: Goal) -> Color {
+        switch goal.priority {
+        case .none: return .gray
+        case .low: return .green
+        case .medium: return .blue
+        case .high: return .orange
+        case .urgent: return .red
         }
     }
 }

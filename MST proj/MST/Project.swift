@@ -18,6 +18,7 @@ final class Project {
     var isCompleted: Bool
     var completedDate: Date?
     var colorCode: String?
+    var subject: String = ""
     @Relationship(deleteRule: .cascade, inverse: \Goal.project) var goals: [Goal]
 
     init(
@@ -29,6 +30,7 @@ final class Project {
         isCompleted: Bool = false,
         completedDate: Date? = nil,
         colorCode: String? = nil,
+        subject: String = "",
         goals: [Goal] = []
     ) {
         self.id = id
@@ -39,6 +41,7 @@ final class Project {
         self.isCompleted = isCompleted
         self.completedDate = completedDate
         self.colorCode = colorCode
+        self.subject = subject
         self.goals = goals
     }
 

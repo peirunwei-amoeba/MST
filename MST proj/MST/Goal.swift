@@ -16,7 +16,14 @@ final class Goal {
     var isCompleted: Bool
     var completedDate: Date?
     var sortOrder: Int
+    var priorityRaw: String = "Default"
     var project: Project?
+
+    // Computed property for Priority enum
+    var priority: Priority {
+        get { Priority(rawValue: priorityRaw) ?? .none }
+        set { priorityRaw = newValue.rawValue }
+    }
 
     init(
         id: UUID = UUID(),
@@ -25,6 +32,7 @@ final class Goal {
         isCompleted: Bool = false,
         completedDate: Date? = nil,
         sortOrder: Int = 0,
+        priority: Priority = .none,
         project: Project? = nil
     ) {
         self.id = id
@@ -33,6 +41,7 @@ final class Goal {
         self.isCompleted = isCompleted
         self.completedDate = completedDate
         self.sortOrder = sortOrder
+        self.priorityRaw = priority.rawValue
         self.project = project
     }
 

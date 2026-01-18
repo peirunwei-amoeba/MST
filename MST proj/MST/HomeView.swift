@@ -25,6 +25,7 @@ struct HomeView: View {
     @State private var selectedProject: Project?
     @State private var showingAllProjects = false
     @State private var recentlyCompletedGoalIds: Set<UUID> = []
+    @State private var recentlyCompletedProjectIds: Set<UUID> = []
 
     var body: some View {
         NavigationStack {
@@ -319,6 +320,8 @@ struct HomeView: View {
                 } else {
                     VStack(spacing: 0) {
                         ForEach(Array(visibleProjects.prefix(3).enumerated()), id: \.element.id) { index, project in
+                            let isRecentlyCompleted = recentlyCompletedProjectIds.contains(project.id)
+
                             ConcentricProjectRow(
                                 project: project,
                                 onTap: {
@@ -328,6 +331,11 @@ struct HomeView: View {
                                     completeNextGoalWithDelay(project)
                                 }
                             )
+                            .opacity(isRecentlyCompleted ? 0.6 : 1.0)
+                            .transition(.asymmetric(
+                                insertion: .identity,
+                                removal: .opacity.combined(with: .scale(scale: 0.95)).combined(with: .offset(x: -20))
+                            ))
 
                             if index < min(visibleProjects.count - 1, 2) {
                                 Divider()
@@ -425,7 +433,7 @@ struct HomeView: View {
     }
 
     private var visibleProjects: [Project] {
-        projects.filter { !$0.isCompleted }
+        projects.filter { !$0.isCompleted || recentlyCompletedProjectIds.contains($0.id) }
     }
 
     private func completeNextGoalWithDelay(_ project: Project) {
@@ -435,8 +443,28 @@ struct HomeView: View {
         feedbackGenerator.notificationOccurred(.success)
         AudioServicesPlaySystemSound(1407)
 
+        // Check if this is the last goal (project will be completed after this)
+        let isLastGoal = project.goals.filter { !$0.isCompleted }.count == 1
+
         withAnimation {
             nextGoal.toggleCompletion()
+        }
+
+        // If project is now fully completed, trigger fade-out
+        if isLastGoal {
+            recentlyCompletedProjectIds.insert(project.id)
+
+            // Mark project as completed
+            withAnimation {
+                project.isCompleted = true
+                project.completedDate = Date()
+            }
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                withAnimation(.easeOut(duration: 0.4)) {
+                    _ = recentlyCompletedProjectIds.remove(project.id)
+                }
+            }
         }
     }
 }
@@ -501,6 +529,17 @@ struct ConcentricProjectRow: View {
                             .foregroundStyle(.primary)
                             .lineLimit(1)
 
+                        // Subject pill
+                        if !project.subject.isEmpty {
+                            Text(project.subject)
+                                .font(.caption2.weight(.medium))
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3)
+                                .background(themeManager.accentColor.opacity(0.12))
+                                .foregroundStyle(themeManager.accentColor)
+                                .clipShape(Capsule())
+                        }
+
                         Spacer()
 
                         // Next goal's target date (or project deadline if all complete)
@@ -558,10 +597,10 @@ struct ConcentricProjectRow: View {
             HStack(alignment: .top, spacing: columnWidth - dotSize) {
                 ForEach(goals) { goal in
                     VStack(spacing: 4) {
-                        // Checkmark dot
+                        // Checkmark dot - colored by priority when incomplete
                         Image(systemName: goal.isCompleted ? "checkmark.circle.fill" : "circle")
                             .font(.system(size: dotSize))
-                            .foregroundStyle(goal.isCompleted ? .green : .secondary.opacity(0.5))
+                            .foregroundStyle(goal.isCompleted ? .green : goalPriorityColor(goal))
                             .contentTransition(.symbolEffect(.replace.magic(fallback: .replace)))
 
                         // Title caption centered under dot - allow 2 lines
@@ -583,6 +622,16 @@ struct ConcentricProjectRow: View {
                         .padding(.top, 2)
                 }
             }
+        }
+    }
+
+    private func goalPriorityColor(_ goal: Goal) -> Color {
+        switch goal.priority {
+        case .none: return .gray.opacity(0.5)
+        case .low: return .green.opacity(0.6)
+        case .medium: return .blue.opacity(0.6)
+        case .high: return .orange.opacity(0.7)
+        case .urgent: return .red.opacity(0.8)
         }
     }
 }
@@ -710,6 +759,7 @@ struct ConcentricAssignmentRow: View {
         case .high: return .orange
         case .medium: return .yellow
         case .low: return .green
+        @unknown default: return .gray
         }
     }
 }

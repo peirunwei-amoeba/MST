@@ -15,12 +15,15 @@ struct EditProjectView: View {
 
     @State private var newGoalTitle = ""
     @State private var newGoalDate = Date()
+    @State private var newGoalPriority: Priority = .none
 
     var body: some View {
         NavigationStack {
             Form {
                 Section("Project Details") {
                     TextField("Title", text: $project.title)
+
+                    TextField("Subject (optional)", text: $project.subject)
 
                     TextField("Description", text: $project.projectDescription, axis: .vertical)
                         .lineLimit(3...6)
@@ -56,7 +59,22 @@ struct EditProjectView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         TextField("New goal title", text: $newGoalTitle)
                         HStack {
-                            DatePicker("Target date", selection: $newGoalDate, displayedComponents: .date)
+                            DatePicker("Target", selection: $newGoalDate, displayedComponents: .date)
+                                .labelsHidden()
+
+                            Picker("Priority", selection: $newGoalPriority) {
+                                ForEach(Priority.allCases, id: \.self) { priority in
+                                    HStack {
+                                        Circle()
+                                            .fill(priorityColor(for: priority))
+                                            .frame(width: 10, height: 10)
+                                        Text(priority.rawValue)
+                                    }
+                                    .tag(priority)
+                                }
+                            }
+                            .pickerStyle(.menu)
+
                             Button {
                                 addGoal()
                             } label: {
@@ -101,15 +119,27 @@ struct EditProjectView: View {
         }
     }
 
+    private func priorityColor(for priority: Priority) -> Color {
+        switch priority {
+        case .none: return .gray
+        case .low: return .green
+        case .medium: return .blue
+        case .high: return .orange
+        case .urgent: return .red
+        }
+    }
+
     private func addGoal() {
         let goal = Goal(
             title: newGoalTitle.trimmingCharacters(in: .whitespaces),
             targetDate: newGoalDate,
             sortOrder: project.goals.count,
+            priority: newGoalPriority,
             project: project
         )
         project.goals.append(goal)
         newGoalTitle = ""
+        newGoalPriority = .none
         newGoalDate = Calendar.current.date(byAdding: .weekOfYear, value: 1, to: newGoalDate) ?? newGoalDate
     }
 
@@ -131,11 +161,24 @@ struct EditProjectView: View {
 struct GoalEditRow: View {
     @Bindable var goal: Goal
 
+    private var checkmarkColor: Color {
+        if goal.isCompleted {
+            return .green
+        }
+        switch goal.priority {
+        case .none: return .gray
+        case .low: return .green
+        case .medium: return .blue
+        case .high: return .orange
+        case .urgent: return .red
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Image(systemName: goal.isCompleted ? "checkmark.circle.fill" : "circle")
-                    .foregroundStyle(goal.isCompleted ? .green : .secondary)
+                    .foregroundStyle(checkmarkColor)
 
                 TextField("Goal title", text: $goal.title)
             }
@@ -144,7 +187,18 @@ struct GoalEditRow: View {
                 DatePicker("Target", selection: $goal.targetDate, displayedComponents: .date)
                     .labelsHidden()
 
-                Spacer()
+                Picker("Priority", selection: $goal.priority) {
+                    ForEach(Priority.allCases, id: \.self) { priority in
+                        HStack {
+                            Circle()
+                                .fill(priorityColor(for: priority))
+                                .frame(width: 10, height: 10)
+                            Text(priority.rawValue)
+                        }
+                        .tag(priority)
+                    }
+                }
+                .pickerStyle(.menu)
 
                 Toggle("Done", isOn: $goal.isCompleted)
                     .labelsHidden()
@@ -155,6 +209,16 @@ struct GoalEditRow: View {
             }
         }
         .padding(.vertical, 4)
+    }
+
+    private func priorityColor(for priority: Priority) -> Color {
+        switch priority {
+        case .none: return .gray
+        case .low: return .green
+        case .medium: return .blue
+        case .high: return .orange
+        case .urgent: return .red
+        }
     }
 }
 

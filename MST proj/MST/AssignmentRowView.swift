@@ -104,12 +104,12 @@ struct AssignmentRowView: View {
                 Image(systemName: "exclamationmark")
                     .font(.caption.bold())
                     .foregroundStyle(.orange)
-            case .medium:
-                EmptyView()
             case .low:
                 Image(systemName: "arrow.down")
                     .font(.caption)
                     .foregroundStyle(.green)
+            case .medium, .none:
+                EmptyView()
             }
         }
     }

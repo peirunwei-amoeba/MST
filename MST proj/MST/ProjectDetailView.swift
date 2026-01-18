@@ -137,8 +137,10 @@ struct ProjectDetailView: View {
                             toggleGoalCompletion(goal)
                         }
                     )
-                    .padding(20)
+                    .padding(.vertical, 20)
+                    .padding(.horizontal, 24)
                 }
+                .scrollClipDisabled()
                 .background {
                     RoundedRectangle(cornerRadius: 20, style: .continuous)
                         .fill(.ultraThinMaterial)
@@ -263,15 +265,25 @@ struct GoalColumnView: View {
     let isEnabled: Bool
     let onToggleComplete: () -> Void
 
+    private var priorityColor: Color {
+        switch goal.priority {
+        case .none: return .gray
+        case .low: return .green
+        case .medium: return .blue
+        case .high: return .orange
+        case .urgent: return .red
+        }
+    }
+
     var body: some View {
         VStack(spacing: 8) {
-            // Big checkmark button
+            // Big checkmark button - colored by priority when incomplete
             Button {
                 onToggleComplete()
             } label: {
                 Image(systemName: goal.isCompleted ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: dotSize))
-                    .foregroundStyle(goal.isCompleted ? .green : (isEnabled ? .secondary.opacity(0.5) : .secondary.opacity(0.25)))
+                    .foregroundStyle(goal.isCompleted ? .green : (isEnabled ? priorityColor : priorityColor.opacity(0.4)))
                     .contentTransition(.symbolEffect(.replace.magic(fallback: .replace)))
             }
             .buttonStyle(.plain)
