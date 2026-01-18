@@ -189,8 +189,19 @@ struct ProjectDetailView: View {
             AudioServicesPlaySystemSound(1407)
         }
 
+        // Check if this is the last incomplete goal (project will be completed after this)
+        let isLastGoal = !wasCompleted && project.goals.filter { !$0.isCompleted }.count == 1
+
         withAnimation {
             goal.toggleCompletion()
+        }
+
+        // If all goals are now completed, mark project as completed
+        if isLastGoal {
+            withAnimation {
+                project.isCompleted = true
+                project.completedDate = Date()
+            }
         }
     }
 }

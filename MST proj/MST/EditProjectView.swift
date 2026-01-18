@@ -205,6 +205,21 @@ struct GoalEditRow: View {
                     .toggleStyle(.switch)
                     .onChange(of: goal.isCompleted) { _, newValue in
                         goal.completedDate = newValue ? Date() : nil
+
+                        if let project = goal.project {
+                            if !newValue && project.isCompleted {
+                                // If goal is unchecked and parent project was completed, mark project as incomplete
+                                project.isCompleted = false
+                                project.completedDate = nil
+                            } else if newValue && !project.isCompleted {
+                                // If goal is checked, check if all goals are now completed
+                                let allGoalsCompleted = project.goals.allSatisfy { $0.isCompleted }
+                                if allGoalsCompleted {
+                                    project.isCompleted = true
+                                    project.completedDate = Date()
+                                }
+                            }
+                        }
                     }
             }
         }

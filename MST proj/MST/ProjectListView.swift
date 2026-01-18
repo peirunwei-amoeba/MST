@@ -448,14 +448,27 @@ struct ProjectRowView: View {
     private func toggleGoal(_ goal: Goal, at index: Int, in goals: [Goal]) {
         guard canToggle(index, in: goals) else { return }
 
-        if !goal.isCompleted {
+        let wasCompleted = goal.isCompleted
+
+        if !wasCompleted {
             let feedbackGenerator = UINotificationFeedbackGenerator()
             feedbackGenerator.notificationOccurred(.success)
             AudioServicesPlaySystemSound(1407)
         }
 
+        // Check if this is the last incomplete goal (project will be completed after this)
+        let isLastGoal = !wasCompleted && goals.filter { !$0.isCompleted }.count == 1
+
         withAnimation {
             goal.toggleCompletion()
+        }
+
+        // If all goals are now completed, mark project as completed
+        if isLastGoal, let project = goal.project {
+            withAnimation {
+                project.isCompleted = true
+                project.completedDate = Date()
+            }
         }
     }
 

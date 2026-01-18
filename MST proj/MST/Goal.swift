@@ -62,5 +62,20 @@ final class Goal {
     func toggleCompletion() {
         isCompleted.toggle()
         completedDate = isCompleted ? Date() : nil
+
+        if let project = project {
+            if !isCompleted && project.isCompleted {
+                // If a goal is unchecked and the parent project was completed, mark project as incomplete
+                project.isCompleted = false
+                project.completedDate = nil
+            } else if isCompleted && !project.isCompleted {
+                // If a goal is checked, check if all goals are now completed
+                let allGoalsCompleted = project.goals.allSatisfy { $0.isCompleted }
+                if allGoalsCompleted {
+                    project.isCompleted = true
+                    project.completedDate = Date()
+                }
+            }
+        }
     }
 }
