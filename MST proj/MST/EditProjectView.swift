@@ -16,6 +16,9 @@ struct EditProjectView: View {
     @State private var newGoalTitle = ""
     @State private var newGoalDate = Date()
     @State private var newGoalPriority: Priority = .none
+    @State private var newGoalHasTarget = false
+    @State private var newGoalTargetValue: Double = 1.0
+    @State private var newGoalTargetUnit: TargetUnit = .hour
 
     var body: some View {
         NavigationStack {
@@ -58,6 +61,7 @@ struct EditProjectView: View {
                     // Add new goal inline
                     VStack(alignment: .leading, spacing: 8) {
                         TextField("New goal title", text: $newGoalTitle)
+
                         HStack {
                             DatePicker("Target", selection: $newGoalDate, displayedComponents: .date)
                                 .labelsHidden()
@@ -82,6 +86,32 @@ struct EditProjectView: View {
                                     .font(.title2)
                             }
                             .disabled(newGoalTitle.trimmingCharacters(in: .whitespaces).isEmpty)
+                        }
+
+                        // Target value/unit row
+                        HStack {
+                            Toggle("Target", isOn: $newGoalHasTarget)
+                                .labelsHidden()
+                            Text("Target:")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+
+                            if newGoalHasTarget {
+                                TextField("", value: $newGoalTargetValue, format: .number)
+                                    .keyboardType(.decimalPad)
+                                    .frame(width: 50)
+                                    .textFieldStyle(.roundedBorder)
+
+                                Picker("", selection: $newGoalTargetUnit) {
+                                    ForEach(TargetUnit.allCases) { unit in
+                                        Text(unit.rawValue).tag(unit)
+                                    }
+                                }
+                                .pickerStyle(.menu)
+                            } else {
+                                Text("None")
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
                     .padding(.vertical, 4)
@@ -135,11 +165,16 @@ struct EditProjectView: View {
             targetDate: newGoalDate,
             sortOrder: project.goals.count,
             priority: newGoalPriority,
-            project: project
+            project: project,
+            targetValue: newGoalHasTarget ? newGoalTargetValue : nil,
+            targetUnit: newGoalHasTarget ? newGoalTargetUnit : .none
         )
         project.goals.append(goal)
         newGoalTitle = ""
         newGoalPriority = .none
+        newGoalHasTarget = false
+        newGoalTargetValue = 1.0
+        newGoalTargetUnit = .hour
         newGoalDate = Calendar.current.date(byAdding: .weekOfYear, value: 1, to: newGoalDate) ?? newGoalDate
     }
 
@@ -172,6 +207,28 @@ struct GoalEditRow: View {
         case .high: return .orange
         case .urgent: return .red
         }
+    }
+
+    private var hasTargetBinding: Binding<Bool> {
+        Binding(
+            get: { goal.targetValue != nil },
+            set: { newValue in
+                if newValue {
+                    goal.targetValue = 1.0
+                    goal.targetUnit = .hour
+                } else {
+                    goal.targetValue = nil
+                    goal.targetUnit = .none
+                }
+            }
+        )
+    }
+
+    private var targetValueBinding: Binding<Double> {
+        Binding(
+            get: { goal.targetValue ?? 1.0 },
+            set: { goal.targetValue = $0 }
+        )
     }
 
     var body: some View {
@@ -221,6 +278,32 @@ struct GoalEditRow: View {
                             }
                         }
                     }
+            }
+
+            // Target value/unit row
+            HStack {
+                Toggle("Target", isOn: hasTargetBinding)
+                    .labelsHidden()
+                Text("Target:")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                if goal.targetValue != nil {
+                    TextField("", value: targetValueBinding, format: .number)
+                        .keyboardType(.decimalPad)
+                        .frame(width: 50)
+                        .textFieldStyle(.roundedBorder)
+
+                    Picker("", selection: $goal.targetUnit) {
+                        ForEach(TargetUnit.allCases) { unit in
+                            Text(unit.rawValue).tag(unit)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                } else {
+                    Text("None")
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .padding(.vertical, 4)

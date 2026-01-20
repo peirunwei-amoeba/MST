@@ -24,6 +24,19 @@ final class Assignment {
     var estimatedDuration: TimeInterval?
     var notificationEnabled: Bool
     var colorCode: String?
+    var targetValue: Double?
+    var targetUnitRaw: String = ""
+
+    // Computed: Unit enum
+    var targetUnit: TargetUnit {
+        get { TargetUnit(rawValue: targetUnitRaw) ?? .none }
+        set { targetUnitRaw = newValue.rawValue }
+    }
+
+    var formattedTarget: String? {
+        guard let value = targetValue, targetUnit != .none else { return nil }
+        return targetUnit.format(value)
+    }
 
     init(
         id: UUID = UUID(),
@@ -39,7 +52,9 @@ final class Assignment {
         notes: String = "",
         estimatedDuration: TimeInterval? = nil,
         notificationEnabled: Bool = true,
-        colorCode: String? = nil
+        colorCode: String? = nil,
+        targetValue: Double? = nil,
+        targetUnit: TargetUnit = .none
     ) {
         self.id = id
         self.title = title
@@ -55,6 +70,8 @@ final class Assignment {
         self.estimatedDuration = estimatedDuration
         self.notificationEnabled = notificationEnabled
         self.colorCode = colorCode
+        self.targetValue = targetValue
+        self.targetUnitRaw = targetUnit.rawValue
     }
 
     // MARK: - Computed Properties

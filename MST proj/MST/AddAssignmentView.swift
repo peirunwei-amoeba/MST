@@ -20,6 +20,9 @@ struct AddAssignmentView: View {
     @State private var subject = ""
     @State private var notes = ""
     @State private var notificationEnabled = true
+    @State private var hasTarget = false
+    @State private var targetValue: Double = 1.0
+    @State private var targetUnit: TargetUnit = .times
 
     // For navigating to edit after creation
     var onAssignmentCreated: ((Assignment) -> Void)?
@@ -46,6 +49,33 @@ struct AddAssignmentView: View {
                         ForEach(Priority.allCases, id: \.self) { priority in
                             Text(priority.rawValue).tag(priority)
                         }
+                    }
+                }
+
+                Section("Target (Optional)") {
+                    Toggle("Set a target", isOn: $hasTarget)
+
+                    if hasTarget {
+                        HStack {
+                            Text("Amount")
+                            Spacer()
+                            TextField("Value", value: $targetValue, format: .number)
+                                .keyboardType(.decimalPad)
+                                .multilineTextAlignment(.trailing)
+                                .frame(width: 80)
+
+                            Picker("", selection: $targetUnit) {
+                                ForEach(TargetUnit.allCases) { unit in
+                                    Text(unit.displayName).tag(unit)
+                                }
+                            }
+                            .pickerStyle(.menu)
+                            .frame(width: 120)
+                        }
+                    }
+                } footer: {
+                    if hasTarget {
+                        Text("e.g., Run 3 km, Study 2 hours")
                     }
                 }
 
@@ -85,7 +115,9 @@ struct AddAssignmentView: View {
             priority: priority,
             subject: subject,
             notes: notes,
-            notificationEnabled: notificationEnabled
+            notificationEnabled: notificationEnabled,
+            targetValue: hasTarget ? targetValue : nil,
+            targetUnit: hasTarget ? targetUnit : .none
         )
 
         modelContext.insert(assignment)

@@ -13,6 +13,7 @@ struct HomeView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Assignment.dueDate) private var assignments: [Assignment]
     @Query(sort: \Project.deadline) private var projects: [Project]
+    @Query(sort: \Habit.createdDate) private var habits: [Habit]
     @EnvironmentObject private var themeManager: ThemeManager
 
     @State private var showingAddSheet = false
@@ -27,10 +28,20 @@ struct HomeView: View {
     @State private var recentlyCompletedGoalIds: Set<UUID> = []
     @State private var recentlyCompletedProjectIds: Set<UUID> = []
 
+    // Habit-related state
+    @State private var showingAddHabitSheet = false
+    @State private var selectedHabit: Habit?
+    @State private var showingAllHabits = false
+    @State private var recentlyCompletedHabitIds: Set<UUID> = []
+    @State private var showingMilestoneCompletion: Habit?
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
+                    // Habits section (at the top)
+                    habitsSection
+
                     // Upcoming assignments section
                     assignmentSection
 
@@ -85,6 +96,216 @@ struct HomeView: View {
                             }
                         }
                 }
+            }
+            .sheet(isPresented: $showingAddHabitSheet) {
+                AddHabitView()
+            }
+            .sheet(item: $selectedHabit) { habit in
+                NavigationStack {
+                    HabitDetailView(habit: habit)
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button("Done") {
+                                    selectedHabit = nil
+                                }
+                            }
+                        }
+                }
+            }
+            .sheet(isPresented: $showingAllHabits) {
+                NavigationStack {
+                    HabitListView()
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button("Done") {
+                                    showingAllHabits = false
+                                }
+                            }
+                        }
+                }
+            }
+            .sheet(item: $showingMilestoneCompletion) { habit in
+                MilestoneCompletionView(
+                    habit: habit,
+                    onComplete: {
+                        withAnimation {
+                            habit.terminate()
+                        }
+                        // Fade out from concentric view
+                        recentlyCompletedHabitIds.insert(habit.id)
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                            withAnimation(.easeOut(duration: 0.5)) {
+                                _ = recentlyCompletedHabitIds.remove(habit.id)
+                            }
+                        }
+                    },
+                    onContinue: {
+                        habit.markMilestoneShown()
+                    }
+                )
+            }
+        }
+    }
+
+    // MARK: - Habits Section (iOS 26 Concentric Style)
+
+    private var habitsSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // Section header
+            HStack {
+                Label("Habits", systemImage: "flame.fill")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.primary)
+
+                Spacer()
+
+                Button {
+                    showingAllHabits = true
+                } label: {
+                    Text("See All")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(themeManager.accentColor)
+                }
+
+                Button {
+                    showingAddHabitSheet = true
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(themeManager.accentColor)
+                        .padding(12)
+                        .glassEffect(.regular)
+                        .clipShape(Circle())
+                }
+            }
+            .padding(.horizontal, 4)
+
+            // Horizontal scroll of habit cards
+            Group {
+                if activeHabits.isEmpty {
+                    emptyHabitCard
+                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                } else {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 12) {
+                            ForEach(activeHabits) { habit in
+                                let isRecentlyCompleted = recentlyCompletedHabitIds.contains(habit.id)
+
+                                ConcentricHabitCard(
+                                    habit: habit,
+                                    isRecentlyCompleted: isRecentlyCompleted,
+                                    onTap: { selectedHabit = habit },
+                                    onToggleComplete: { completeHabitWithAnimation(habit) }
+                                )
+                                .transition(.asymmetric(
+                                    insertion: .identity,
+                                    removal: .opacity.combined(with: .scale(scale: 0.9)).combined(with: .offset(y: 10))
+                                ))
+                            }
+                        }
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 4)
+                    }
+                    .scrollClipDisabled()
+                }
+            }
+            .animation(.easeInOut(duration: 0.4), value: activeHabits.isEmpty)
+        }
+        .padding(20)
+        .background {
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .fill(.regularMaterial)
+                .shadow(color: .black.opacity(0.06), radius: 20, x: 0, y: 8)
+        }
+        .overlay(
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [.white.opacity(0.3), .white.opacity(0.1)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 0.5
+                )
+        )
+    }
+
+    private var emptyHabitCard: some View {
+        VStack(spacing: 16) {
+            ZStack {
+                Circle()
+                    .fill(Color.orange.opacity(0.15))
+                    .frame(width: 64, height: 64)
+
+                Image(systemName: "flame.fill")
+                    .font(.system(size: 32))
+                    .foregroundStyle(.orange)
+            }
+
+            VStack(spacing: 4) {
+                Text("Build good habits")
+                    .font(.headline)
+
+                Text("Track daily habits and build streaks")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+
+            Button {
+                showingAddHabitSheet = true
+            } label: {
+                Label("Add Habit", systemImage: "plus")
+                    .font(.subheadline.weight(.medium))
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+            }
+            .buttonStyle(.borderedProminent)
+            .buttonBorderShape(.capsule)
+            .tint(themeManager.accentColor)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 28)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+    }
+
+    private var activeHabits: [Habit] {
+        habits.filter { !$0.isTerminated || recentlyCompletedHabitIds.contains($0.id) }
+    }
+
+    private func completeHabitWithAnimation(_ habit: Habit) {
+        let wasCompletedToday = habit.isCompletedToday
+
+        if !wasCompletedToday {
+            // About to complete - haptic feedback and sound
+            let feedbackGenerator = UINotificationFeedbackGenerator()
+            feedbackGenerator.notificationOccurred(.success)
+            AudioServicesPlaySystemSound(1407)
+
+            // Complete today
+            withAnimation {
+                habit.completeToday()
+            }
+
+            // Check if milestone was just reached
+            if habit.justHitMilestone {
+                // Show milestone modal after a brief delay
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    showingMilestoneCompletion = habit
+                }
+            } else {
+                // Normal fade animation for daily completion
+                recentlyCompletedHabitIds.insert(habit.id)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    withAnimation(.easeOut(duration: 0.5)) {
+                        _ = recentlyCompletedHabitIds.remove(habit.id)
+                    }
+                }
+            }
+        } else {
+            // Unchecking - just toggle immediately
+            withAnimation {
+                habit.uncompleteToday()
             }
         }
     }
@@ -604,13 +825,22 @@ struct ConcentricProjectRow: View {
                             .contentTransition(.symbolEffect(.replace.magic(fallback: .replace)))
 
                         // Title caption centered under dot - allow 2 lines
-                        Text(goal.title)
-                            .font(.system(size: 9))
-                            .foregroundStyle(goal.isCompleted ? .secondary : .primary)
-                            .lineLimit(2)
-                            .multilineTextAlignment(.center)
-                            .frame(width: columnWidth + 8, alignment: .center)
-                            .fixedSize(horizontal: false, vertical: true)
+                        VStack(spacing: 2) {
+                            Text(goal.title)
+                                .font(.system(size: 9))
+                                .foregroundStyle(goal.isCompleted ? .secondary : .primary)
+                                .lineLimit(2)
+                                .multilineTextAlignment(.center)
+
+                            // Target value/unit if present
+                            if let target = goal.formattedTarget {
+                                Text(target)
+                                    .font(.system(size: 8, weight: .medium))
+                                    .foregroundStyle(.purple)
+                            }
+                        }
+                        .frame(width: columnWidth + 8, alignment: .center)
+                        .fixedSize(horizontal: false, vertical: true)
                     }
                     .frame(width: dotSize)
                 }
@@ -703,6 +933,17 @@ struct ConcentricAssignmentRow: View {
                                 .clipShape(Capsule())
                         }
 
+                        // Target value/unit pill
+                        if let target = assignment.formattedTarget {
+                            Text(target)
+                                .font(.caption2.weight(.medium))
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3)
+                                .background(Color.purple.opacity(0.12))
+                                .foregroundStyle(.purple)
+                                .clipShape(Capsule())
+                        }
+
                         // Due date
                         HStack(spacing: 3) {
                             Image(systemName: "clock")
@@ -766,6 +1007,6 @@ struct ConcentricAssignmentRow: View {
 
 #Preview {
     HomeView()
-        .modelContainer(for: [Assignment.self, Project.self, Goal.self], inMemory: true)
+        .modelContainer(for: [Assignment.self, Project.self, Goal.self, Habit.self, HabitEntry.self], inMemory: true)
         .environmentObject(ThemeManager())
 }

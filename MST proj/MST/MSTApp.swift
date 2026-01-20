@@ -17,6 +17,6 @@ struct MSTApp: App {
             ContentView()
                 .environmentObject(themeManager)
         }
-        .modelContainer(for: [Assignment.self, Project.self, Goal.self])
+        .modelContainer(for: [Assignment.self, Project.self, Goal.self, Habit.self, HabitEntry.self])
     }
 }

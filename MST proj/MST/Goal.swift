@@ -18,11 +18,24 @@ final class Goal {
     var sortOrder: Int
     var priorityRaw: String = "Default"
     var project: Project?
+    var targetValue: Double?
+    var targetUnitRaw: String = ""
 
     // Computed property for Priority enum
     var priority: Priority {
         get { Priority(rawValue: priorityRaw) ?? .none }
         set { priorityRaw = newValue.rawValue }
+    }
+
+    // Computed: Unit enum
+    var targetUnit: TargetUnit {
+        get { TargetUnit(rawValue: targetUnitRaw) ?? .none }
+        set { targetUnitRaw = newValue.rawValue }
+    }
+
+    var formattedTarget: String? {
+        guard let value = targetValue, targetUnit != .none else { return nil }
+        return targetUnit.format(value)
     }
 
     init(
@@ -33,7 +46,9 @@ final class Goal {
         completedDate: Date? = nil,
         sortOrder: Int = 0,
         priority: Priority = .none,
-        project: Project? = nil
+        project: Project? = nil,
+        targetValue: Double? = nil,
+        targetUnit: TargetUnit = .none
     ) {
         self.id = id
         self.title = title
@@ -43,6 +58,8 @@ final class Goal {
         self.sortOrder = sortOrder
         self.priorityRaw = priority.rawValue
         self.project = project
+        self.targetValue = targetValue
+        self.targetUnitRaw = targetUnit.rawValue
     }
 
     // MARK: - Computed Properties

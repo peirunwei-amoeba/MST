@@ -416,12 +416,21 @@ struct ProjectRowView: View {
                         .buttonStyle(.plain)
                         .disabled(!canToggle(index, in: goals))
 
-                        Text(goal.title)
-                            .font(.system(size: 9))
-                            .foregroundStyle(goal.isCompleted ? .secondary : .primary)
-                            .lineLimit(2)
-                            .multilineTextAlignment(.center)
-                            .frame(width: columnWidth)
+                        VStack(spacing: 2) {
+                            Text(goal.title)
+                                .font(.system(size: 9))
+                                .foregroundStyle(goal.isCompleted ? .secondary : .primary)
+                                .lineLimit(2)
+                                .multilineTextAlignment(.center)
+
+                            // Target value/unit if present
+                            if let target = goal.formattedTarget {
+                                Text(target)
+                                    .font(.system(size: 8, weight: .medium))
+                                    .foregroundStyle(.purple)
+                            }
+                        }
+                        .frame(width: columnWidth)
                     }
                     .frame(width: dotSize)
                 }

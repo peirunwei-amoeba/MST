@@ -46,7 +46,7 @@ struct AssignmentRowView: View {
                             .strikethrough(assignment.isCompleted)
                             .foregroundStyle(assignment.isCompleted ? .secondary : .primary)
 
-                        // Subject and due date
+                        // Subject, target, and due date
                         HStack(spacing: 8) {
                             if !assignment.subject.isEmpty {
                                 Text(assignment.subject)
@@ -55,6 +55,17 @@ struct AssignmentRowView: View {
                                     .padding(.vertical, 2)
                                     .background(Color.blue.opacity(0.15))
                                     .foregroundStyle(.blue)
+                                    .clipShape(Capsule())
+                            }
+
+                            // Target value/unit pill
+                            if let target = assignment.formattedTarget {
+                                Text(target)
+                                    .font(.caption)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Color.purple.opacity(0.15))
+                                    .foregroundStyle(.purple)
                                     .clipShape(Capsule())
                             }
 

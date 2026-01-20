@@ -301,13 +301,22 @@ struct GoalColumnView: View {
             .disabled(!isEnabled)
 
             // Title - allow 2 lines with dynamic width
-            Text(goal.title)
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(goal.isCompleted ? .secondary : (isEnabled ? .primary : .secondary))
-                .lineLimit(2)
-                .multilineTextAlignment(.center)
-                .frame(width: columnWidth + 10, alignment: .center)
-                .fixedSize(horizontal: false, vertical: true)
+            VStack(spacing: 2) {
+                Text(goal.title)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(goal.isCompleted ? .secondary : (isEnabled ? .primary : .secondary))
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+
+                // Target value/unit if present
+                if let target = goal.formattedTarget {
+                    Text(target)
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(.purple)
+                }
+            }
+            .frame(width: columnWidth + 10, alignment: .center)
+            .fixedSize(horizontal: false, vertical: true)
 
             // Date
             Text(goal.formattedTargetDate)

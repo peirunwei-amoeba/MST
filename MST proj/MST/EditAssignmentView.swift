@@ -69,6 +69,33 @@ struct EditAssignmentView: View {
                     }
                 }
 
+                Section("Target") {
+                    Toggle("Has target", isOn: hasTargetBinding)
+
+                    if assignment.targetValue != nil {
+                        HStack {
+                            Text("Amount")
+                            Spacer()
+                            TextField("Value", value: targetValueBinding, format: .number)
+                                .keyboardType(.decimalPad)
+                                .multilineTextAlignment(.trailing)
+                                .frame(width: 80)
+
+                            Picker("", selection: $assignment.targetUnit) {
+                                ForEach(TargetUnit.allCases) { unit in
+                                    Text(unit.displayName).tag(unit)
+                                }
+                            }
+                            .pickerStyle(.menu)
+                            .frame(width: 120)
+                        }
+                    }
+                } footer: {
+                    if assignment.targetValue != nil {
+                        Text("e.g., Run 3 km, Study 2 hours")
+                    }
+                }
+
                 Section("Additional") {
                     TextField("Notes", text: $assignment.notes, axis: .vertical)
                         .lineLimit(2...4)
@@ -95,6 +122,28 @@ struct EditAssignmentView: View {
                 }
             }
         }
+    }
+
+    private var hasTargetBinding: Binding<Bool> {
+        Binding(
+            get: { assignment.targetValue != nil },
+            set: { newValue in
+                if newValue {
+                    assignment.targetValue = 1.0
+                    assignment.targetUnit = .times
+                } else {
+                    assignment.targetValue = nil
+                    assignment.targetUnit = .none
+                }
+            }
+        )
+    }
+
+    private var targetValueBinding: Binding<Double> {
+        Binding(
+            get: { assignment.targetValue ?? 1.0 },
+            set: { assignment.targetValue = $0 }
+        )
     }
 
     private func updateDueDate() {
