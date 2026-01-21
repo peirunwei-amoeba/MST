@@ -52,7 +52,7 @@ struct AddAssignmentView: View {
                     }
                 }
 
-                Section("Target (Optional)") {
+                Section {
                     Toggle("Set a target", isOn: $hasTarget)
 
                     if hasTarget {
@@ -73,6 +73,8 @@ struct AddAssignmentView: View {
                             .frame(width: 120)
                         }
                     }
+                } header: {
+                    Text("Target (Optional)")
                 } footer: {
                     if hasTarget {
                         Text("e.g., Run 3 km, Study 2 hours")
