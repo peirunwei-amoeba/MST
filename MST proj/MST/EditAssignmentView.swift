@@ -69,7 +69,7 @@ struct EditAssignmentView: View {
                     }
                 }
 
-                Section("Target") {
+                Section {
                     Toggle("Has target", isOn: hasTargetBinding)
 
                     if assignment.targetValue != nil {
@@ -90,6 +90,8 @@ struct EditAssignmentView: View {
                             .frame(width: 120)
                         }
                     }
+                } header: {
+                    Text("Target")
                 } footer: {
                     if assignment.targetValue != nil {
                         Text("e.g., Run 3 km, Study 2 hours")
