@@ -277,10 +277,7 @@ struct HomeView: View {
         let wasCompletedToday = habit.isCompletedToday
 
         if !wasCompletedToday {
-            // About to complete - haptic feedback and sound
-            let feedbackGenerator = UINotificationFeedbackGenerator()
-            feedbackGenerator.notificationOccurred(.success)
-            AudioServicesPlaySystemSound(1407)
+            // Haptics and sound are now handled by ConcentricHabitCard's long-press animation
 
             // Complete today
             withAnimation {
