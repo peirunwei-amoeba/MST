@@ -48,25 +48,30 @@ struct ConcentricHabitCard: View {
                         .foregroundStyle(.primary)
                         .lineLimit(2)
                         .multilineTextAlignment(.center)
+                        .frame(height: 36) // Fixed height for 2 lines
 
                     Text(habit.formattedTarget)
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
-                    // Streak indicator
-                    if habit.currentStreak > 0 {
-                        HStack(spacing: 2) {
+                    // Streak indicator (always show space for consistency)
+                    HStack(spacing: 2) {
+                        if habit.currentStreak > 0 {
                             Image(systemName: "flame.fill")
                                 .font(.caption2)
                                 .foregroundStyle(.orange)
                             Text("\(habit.currentStreak)")
                                 .font(.caption2.weight(.semibold))
                                 .foregroundStyle(.orange)
+                        } else {
+                            Text(" ")
+                                .font(.caption2)
                         }
                     }
+                    .frame(height: 14)
                 }
             }
-            .frame(width: 110)
+            .frame(width: 110, height: 150)
             .padding(.vertical, 16)
             .padding(.horizontal, 12)
             .background(.ultraThinMaterial)

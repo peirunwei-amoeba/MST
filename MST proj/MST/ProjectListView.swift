@@ -299,6 +299,7 @@ struct ProjectRowView: View {
 
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var themeManager: ThemeManager
+    @State private var animatingGoalIds: Set<UUID> = []
 
     private let maxVisibleGoals = 5
     private let dotSize: CGFloat = 22
@@ -404,6 +405,7 @@ struct ProjectRowView: View {
             // Goals layer - checkmarks with titles
             HStack(alignment: .top, spacing: lineWidth) {
                 ForEach(Array(goals.enumerated()), id: \.element.id) { index, goal in
+                    let isAnimating = animatingGoalIds.contains(goal.id)
                     VStack(spacing: 4) {
                         Button {
                             toggleGoal(goal, at: index, in: goals)
@@ -412,6 +414,8 @@ struct ProjectRowView: View {
                                 .font(.system(size: dotSize))
                                 .foregroundStyle(goal.isCompleted ? .green : canToggle(index, in: goals) ? goalPriorityColor(goal) : goalPriorityColor(goal).opacity(0.4))
                                 .contentTransition(.symbolEffect(.replace.magic(fallback: .replace)))
+                                .scaleEffect(isAnimating ? 1.35 : 1.0)
+                                .rotationEffect(.degrees(isAnimating ? 10 : 0))
                         }
                         .buttonStyle(.plain)
                         .disabled(!canToggle(index, in: goals))
@@ -463,6 +467,16 @@ struct ProjectRowView: View {
             let feedbackGenerator = UINotificationFeedbackGenerator()
             feedbackGenerator.notificationOccurred(.success)
             AudioServicesPlaySystemSound(1407)
+
+            // Animate checkmark
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
+                animatingGoalIds.insert(goal.id)
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
+                    _ = animatingGoalIds.remove(goal.id)
+                }
+            }
         }
 
         // Check if this is the last incomplete goal (project will be completed after this)

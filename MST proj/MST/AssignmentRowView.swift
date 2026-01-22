@@ -13,6 +13,8 @@ struct AssignmentRowView: View {
     let onToggleComplete: () -> Void
     let onTap: () -> Void
 
+    @State private var animatingCheckmark = false
+
     var body: some View {
         HStack(spacing: 12) {
             // Interactive completion checkbox with SF Symbol
@@ -24,6 +26,16 @@ struct AssignmentRowView: View {
 
                     // System sound
                     AudioServicesPlaySystemSound(1407)
+
+                    // Animate checkmark
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
+                        animatingCheckmark = true
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                        withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
+                            animatingCheckmark = false
+                        }
+                    }
                 }
                 onToggleComplete()
             } label: {
@@ -31,6 +43,8 @@ struct AssignmentRowView: View {
                     .font(.system(size: 26))
                     .foregroundStyle(assignment.isCompleted ? .green : .secondary.opacity(0.5))
                     .contentTransition(.symbolEffect(.replace.magic(fallback: .replace)))
+                    .scaleEffect(animatingCheckmark ? 1.35 : 1.0)
+                    .rotationEffect(.degrees(animatingCheckmark ? 10 : 0))
             }
             .buttonStyle(.plain)
 

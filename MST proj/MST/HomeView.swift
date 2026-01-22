@@ -698,6 +698,7 @@ struct ConcentricProjectRow: View {
     let onToggleNextGoal: () -> Void
 
     @EnvironmentObject private var themeManager: ThemeManager
+    @State private var animatingGoalId: UUID?
 
     private let maxVisibleGoals = 5
     private let dotSize: CGFloat = 20
@@ -725,6 +726,10 @@ struct ConcentricProjectRow: View {
         return project.isOverdue
     }
 
+    private var isAnimating: Bool {
+        animatingGoalId != nil
+    }
+
     var body: some View {
         Button {
             onTap()
@@ -732,12 +737,24 @@ struct ConcentricProjectRow: View {
             HStack(spacing: 12) {
                 // Main checkmark button for next goal
                 Button {
+                    if let goal = nextGoal {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
+                            animatingGoalId = goal.id
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                            withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
+                                animatingGoalId = nil
+                            }
+                        }
+                    }
                     onToggleNextGoal()
                 } label: {
                     Image(systemName: nextGoal != nil ? "circle" : "checkmark.circle.fill")
                         .font(.system(size: mainCheckmarkSize))
                         .foregroundStyle(nextGoal != nil ? Color.secondary.opacity(0.5) : Color.green)
                         .contentTransition(.symbolEffect(.replace.magic(fallback: .replace)))
+                        .scaleEffect(isAnimating ? 1.35 : 1.0)
+                        .rotationEffect(.degrees(isAnimating ? 10 : 0))
                 }
                 .buttonStyle(.plain)
                 .disabled(nextGoal == nil)
@@ -817,12 +834,15 @@ struct ConcentricProjectRow: View {
             // Dots and titles layer
             HStack(alignment: .top, spacing: columnWidth - dotSize) {
                 ForEach(goals) { goal in
+                    let isGoalAnimating = animatingGoalId == goal.id
                     VStack(spacing: 4) {
                         // Checkmark dot - colored by priority when incomplete
                         Image(systemName: goal.isCompleted ? "checkmark.circle.fill" : "circle")
                             .font(.system(size: dotSize))
                             .foregroundStyle(goal.isCompleted ? .green : goalPriorityColor(goal))
                             .contentTransition(.symbolEffect(.replace.magic(fallback: .replace)))
+                            .scaleEffect(isGoalAnimating ? 1.35 : 1.0)
+                            .rotationEffect(.degrees(isGoalAnimating ? 10 : 0))
 
                         // Title caption centered under dot - allow 2 lines
                         VStack(spacing: 2) {
@@ -875,6 +895,7 @@ struct ConcentricAssignmentRow: View {
     var isRecentlyCompleted: Bool = false
 
     @EnvironmentObject private var themeManager: ThemeManager
+    @State private var animatingCheckmark = false
 
     var body: some View {
         Button {
@@ -890,6 +911,16 @@ struct ConcentricAssignmentRow: View {
 
                         // Play system confirmation sound
                         AudioServicesPlaySystemSound(1407)
+
+                        // Animate checkmark
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
+                            animatingCheckmark = true
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                            withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
+                                animatingCheckmark = false
+                            }
+                        }
                     }
                     onToggleComplete()
                 } label: {
@@ -897,6 +928,8 @@ struct ConcentricAssignmentRow: View {
                         .font(.system(size: 28))
                         .foregroundStyle(assignment.isCompleted ? .green : .secondary.opacity(0.5))
                         .contentTransition(.symbolEffect(.replace.magic(fallback: .replace)))
+                        .scaleEffect(animatingCheckmark ? 1.35 : 1.0)
+                        .rotationEffect(.degrees(animatingCheckmark ? 10 : 0))
                 }
                 .buttonStyle(.plain)
 

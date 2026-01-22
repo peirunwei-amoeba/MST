@@ -17,11 +17,11 @@ struct HabitDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 24) {
+            VStack(spacing: 20) {
                 // Header with target info
                 headerSection
 
-                // Statistics cards
+                // Statistics section
                 statisticsSection
 
                 // Progress toward milestone
@@ -91,56 +91,91 @@ struct HabitDetailView: View {
         .frame(maxWidth: .infinity)
         .padding(20)
         .background {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .fill(.regularMaterial)
+                .shadow(color: .black.opacity(0.06), radius: 20, x: 0, y: 8)
         }
+        .overlay(
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [.white.opacity(0.3), .white.opacity(0.1)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 0.5
+                )
+        )
     }
 
     // MARK: - Statistics Section
 
     private var statisticsSection: some View {
-        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
-            StatisticCard(
-                title: "Current Streak",
-                value: "\(habit.currentStreak)",
-                subtitle: "days",
-                icon: "flame.fill",
-                color: .orange
-            )
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Statistics")
+                .font(.title3.weight(.semibold))
+                .padding(.horizontal, 4)
 
-            StatisticCard(
-                title: "Best Streak",
-                value: "\(habit.bestStreak)",
-                subtitle: "days",
-                icon: "trophy.fill",
-                color: .yellow
-            )
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                StatisticCard(
+                    title: "Current Streak",
+                    value: "\(habit.currentStreak)",
+                    subtitle: "days",
+                    icon: "flame.fill",
+                    color: .orange
+                )
 
-            StatisticCard(
-                title: "Completion Rate",
-                value: String(format: "%.0f", habit.completionRate),
-                subtitle: "%",
-                icon: "chart.line.uptrend.xyaxis",
-                color: .green
-            )
+                StatisticCard(
+                    title: "Best Streak",
+                    value: "\(habit.bestStreak)",
+                    subtitle: "days",
+                    icon: "trophy.fill",
+                    color: .yellow
+                )
 
-            StatisticCard(
-                title: "Total Days",
-                value: "\(habit.completedDaysCount)",
-                subtitle: "completed",
-                icon: "calendar",
-                color: themeManager.accentColor
-            )
+                StatisticCard(
+                    title: "Completion Rate",
+                    value: String(format: "%.0f", habit.completionRate),
+                    subtitle: "%",
+                    icon: "chart.line.uptrend.xyaxis",
+                    color: .green
+                )
+
+                StatisticCard(
+                    title: "Total Days",
+                    value: "\(habit.completedDaysCount)",
+                    subtitle: "completed",
+                    icon: "calendar",
+                    color: themeManager.accentColor
+                )
+            }
         }
+        .padding(20)
+        .background {
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .fill(.regularMaterial)
+                .shadow(color: .black.opacity(0.06), radius: 20, x: 0, y: 8)
+        }
+        .overlay(
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [.white.opacity(0.3), .white.opacity(0.1)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 0.5
+                )
+        )
     }
 
     // MARK: - Milestone Section
 
     private var milestoneSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text("Milestone Progress")
-                    .font(.headline)
+                Label("Milestone Progress", systemImage: "flag.fill")
+                    .font(.title3.weight(.semibold))
 
                 Spacer()
 
@@ -150,8 +185,9 @@ struct HabitDetailView: View {
                         .foregroundStyle(.green)
                 }
             }
+            .padding(.horizontal, 4)
 
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Text("\(habit.completedDaysCount) of \(habit.maxCompletionDays) days")
                         .font(.subheadline)
@@ -166,10 +202,10 @@ struct HabitDetailView: View {
 
                 GeometryReader { geometry in
                     ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 6)
+                        RoundedRectangle(cornerRadius: 8)
                             .fill(.secondary.opacity(0.2))
 
-                        RoundedRectangle(cornerRadius: 6)
+                        RoundedRectangle(cornerRadius: 8)
                             .fill(
                                 LinearGradient(
                                     colors: [themeManager.accentColor, themeManager.accentColor.opacity(0.7)],
@@ -181,7 +217,7 @@ struct HabitDetailView: View {
                             .animation(.easeInOut(duration: 0.5), value: habit.milestoneProgress)
                     }
                 }
-                .frame(height: 12)
+                .frame(height: 16)
 
                 if !habit.hasReachedMilestone {
                     Text("\(habit.daysRemaining) days to go!")
@@ -189,24 +225,56 @@ struct HabitDetailView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+            .padding(16)
+            .background(.ultraThinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .padding(20)
         .background {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .fill(.regularMaterial)
+                .shadow(color: .black.opacity(0.06), radius: 20, x: 0, y: 8)
         }
+        .overlay(
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [.white.opacity(0.3), .white.opacity(0.1)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 0.5
+                )
+        )
     }
 
     // MARK: - Heatmap Section
 
     private var heatmapSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Activity")
-                .font(.headline)
+        VStack(alignment: .leading, spacing: 16) {
+            Label("Activity", systemImage: "calendar")
+                .font(.title3.weight(.semibold))
                 .padding(.horizontal, 4)
 
             HabitHeatmapView(habit: habit)
         }
+        .padding(20)
+        .background {
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .fill(.regularMaterial)
+                .shadow(color: .black.opacity(0.06), radius: 20, x: 0, y: 8)
+        }
+        .overlay(
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [.white.opacity(0.3), .white.opacity(0.1)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 0.5
+                )
+        )
     }
 }
 

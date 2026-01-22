@@ -276,6 +276,8 @@ struct GoalColumnView: View {
     let isEnabled: Bool
     let onToggleComplete: () -> Void
 
+    @State private var animatingCheckmark = false
+
     private var priorityColor: Color {
         switch goal.priority {
         case .none: return .gray
@@ -290,12 +292,24 @@ struct GoalColumnView: View {
         VStack(spacing: 8) {
             // Big checkmark button - colored by priority when incomplete
             Button {
+                if !goal.isCompleted && isEnabled {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
+                        animatingCheckmark = true
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                        withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
+                            animatingCheckmark = false
+                        }
+                    }
+                }
                 onToggleComplete()
             } label: {
                 Image(systemName: goal.isCompleted ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: dotSize))
                     .foregroundStyle(goal.isCompleted ? .green : (isEnabled ? priorityColor : priorityColor.opacity(0.4)))
                     .contentTransition(.symbolEffect(.replace.magic(fallback: .replace)))
+                    .scaleEffect(animatingCheckmark ? 1.35 : 1.0)
+                    .rotationEffect(.degrees(animatingCheckmark ? 10 : 0))
             }
             .buttonStyle(.plain)
             .disabled(!isEnabled)
