@@ -18,6 +18,11 @@ struct ContentView: View {
                     Label("Home", systemImage: "house.fill")
                 }
 
+            FocusView()
+                .tabItem {
+                    Label("Focus", systemImage: "timer")
+                }
+
             SettingsView()
                 .tabItem {
                     Label("Settings", systemImage: "gearshape.fill")
