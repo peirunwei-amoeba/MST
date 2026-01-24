@@ -83,3 +83,18 @@ enum UnitCategory: String, CaseIterable {
     case volume = "Volume"
     case none = "None"
 }
+
+// MARK: - Focus Timer Helpers
+
+extension TargetUnit {
+    /// Converts a value in this unit to minutes. Returns nil if not a time-based unit.
+    func toMinutes(_ value: Double) -> Int? {
+        guard category == .time else { return nil }
+        switch self {
+        case .hour: return Int(value * 60)
+        case .minute: return Int(value)
+        case .second: return max(1, Int(ceil(value / 60)))
+        default: return nil
+        }
+    }
+}
