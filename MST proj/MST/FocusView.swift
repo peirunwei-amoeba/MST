@@ -9,37 +9,40 @@ import SwiftUI
 import SwiftData
 import AVFoundation
 
+// MARK: - Focus View States
+
+enum FocusTimerState {
+    case idle
+    case countdownRunning
+    case countdownPaused
+    case stopwatchRunning
+    case stopwatchPaused
+    case completed
+}
+
 // MARK: - Main Focus View
 
 struct FocusView: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var themeManager: ThemeManager
 
-    // Query all items (filter in computed properties to avoid complex predicates)
     @Query private var allAssignments: [Assignment]
     @Query private var allGoals: [Goal]
     @Query private var allHabits: [Habit]
 
-    // Timer state
-    @State private var selectedMinutes: Int = 25
+    // State
+    @State private var timerState: FocusTimerState = .idle
+    @State private var selectedMinutes: Int = 1
     @State private var remainingSeconds: Int = 0
-    @State private var isRunning = false
-    @State private var isPaused = false
-    @State private var timer: Timer?
-
-    // Stopwatch state (when timer hits 0, starts counting up)
-    @State private var isStopwatchMode = false
     @State private var stopwatchSeconds: Int = 0
+    @State private var timer: Timer?
 
     // Task selection
     @State private var selectedTask: FocusTaskItem?
     @State private var showingTaskPicker = false
 
-    // Completion state
-    @State private var showCompletionOverlay = false
-
-    // Scroll state for picker
-    @State private var scrollPosition: Int? = 25
+    // Scroll
+    @State private var scrollPosition: Int? = 1
 
     private let maxMinutes = 99
 
@@ -47,321 +50,484 @@ struct FocusView: View {
     private var assignments: [Assignment] {
         allAssignments.filter { !$0.isCompleted }
     }
-
     private var goals: [Goal] {
         allGoals.filter { !$0.isCompleted }
     }
-
     private var habits: [Habit] {
         allHabits.filter { !$0.isTerminated }
     }
 
+    private var isRunning: Bool {
+        timerState == .countdownRunning || timerState == .stopwatchRunning
+    }
+
+    private var isStopwatchMode: Bool {
+        timerState == .stopwatchRunning || timerState == .stopwatchPaused || selectedMinutes == 0
+    }
+
     var body: some View {
-        ZStack {
-            // Background color
-            backgroundColor
-                .ignoresSafeArea()
-                .animation(.easeInOut(duration: 0.3), value: isRunning)
-                .animation(.easeInOut(duration: 0.3), value: isStopwatchMode)
+        GeometryReader { geometry in
+            ZStack {
+                // Background - full screen
+                (isRunning ? Color.black : Color(UIColor.systemBackground))
+                    .ignoresSafeArea()
+                    .animation(.easeInOut(duration: 0.3), value: isRunning)
 
-            VStack(spacing: 0) {
-                // Top bar with task picker
-                HStack {
-                    Spacer()
-                    taskPickerButton
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 60)
-
-                Spacer()
-
-                // Main display area
+                // Main display - full screen, extends to all edges
                 mainDisplay
+                    .frame(width: geometry.size.width, height: geometry.size.height + geometry.safeAreaInsets.top + geometry.safeAreaInsets.bottom)
+                    .offset(y: -geometry.safeAreaInsets.top)
 
-                Spacer()
+                // Floating elements on top - these stay in safe area
+                VStack {
+                    // Dropdown at top
+                    taskDropdown
+                        .padding(.top, geometry.safeAreaInsets.top + 10)
 
-                // Bottom time display
-                bottomTimeDisplay
-                    .padding(.bottom, 50)
-            }
+                    Spacer()
 
-            // Completion overlay
-            if showCompletionOverlay {
-                completionOverlayView
-                    .transition(.opacity)
+                    // Bottom time display
+                    bottomTimeDisplay
+                        .padding(.bottom, geometry.safeAreaInsets.bottom + 60)
+                }
+
+                // Completion overlay - only if task selected
+                if timerState == .completed && selectedTask != nil {
+                    completionOverlay
+                        .transition(.opacity)
+                }
             }
         }
-        .onTapGesture {
-            handleTap()
-        }
+        .ignoresSafeArea()
+        .onTapGesture(perform: handleTap)
         .sheet(isPresented: $showingTaskPicker) {
             taskPickerSheet
         }
     }
 
-    // MARK: - Background Color
+    // MARK: - Liquid Glass Task Dropdown
 
-    private var backgroundColor: Color {
-        if isStopwatchMode && isRunning {
-            return Color(white: 0.1) // Dark background for running stopwatch
-        }
-        return Color(UIColor.systemBackground)
-    }
-
-    // MARK: - Task Picker Button
-
-    private var taskPickerButton: some View {
+    private var taskDropdown: some View {
         Button {
             if !isRunning {
                 showingTaskPicker = true
             }
         } label: {
-            ZStack {
-                Circle()
-                    .stroke(Color.secondary.opacity(0.3), lineWidth: 1.5)
-                    .frame(width: 44, height: 44)
-
+            HStack(spacing: 10) {
                 if let task = selectedTask {
                     Image(systemName: task.icon)
-                        .font(.system(size: 16))
-                        .foregroundStyle(.secondary)
+                        .font(.subheadline.weight(.medium))
+                    Text(task.title)
+                        .font(.subheadline.weight(.medium))
+                        .lineLimit(1)
                 } else {
-                    Image(systemName: "circle")
-                        .font(.system(size: 16))
-                        .foregroundStyle(.secondary)
+                    Image(systemName: "plus.circle")
+                        .font(.subheadline.weight(.medium))
+                    Text("Select Task")
+                        .font(.subheadline.weight(.medium))
                 }
+
+                Image(systemName: "chevron.down")
+                    .font(.caption.weight(.semibold))
             }
+            .foregroundStyle(isRunning ? .white.opacity(0.7) : .primary.opacity(0.8))
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
+            .glassEffect(.regular, in: Capsule())
         }
         .disabled(isRunning)
-        .opacity(isRunning ? 0.3 : 1)
+        .opacity(isRunning ? 0.5 : 1)
     }
 
     // MARK: - Main Display
 
     private var mainDisplay: some View {
         Group {
-            if isStopwatchMode {
+            switch timerState {
+            case .idle, .countdownPaused:
+                // Show scroll picker when idle OR paused (so user can change time)
+                scrollPicker
+
+            case .countdownRunning:
+                countdownDisplay
+
+            case .stopwatchRunning, .stopwatchPaused:
                 stopwatchDisplay
-            } else {
-                timerScrollDisplay
+
+            case .completed:
+                EmptyView()
             }
         }
     }
 
-    // MARK: - Timer Scroll Display
+    // MARK: - Scroll Picker
+    // Numbers: 99 at top, 1 near bottom, + at very bottom
 
-    private var timerScrollDisplay: some View {
-        ScrollView(.vertical, showsIndicators: false) {
-            LazyVStack(spacing: 0) {
-                ForEach(1...maxMinutes, id: \.self) { minute in
-                    MinuteCell(
-                        minute: minute,
-                        isRunning: isRunning,
-                        isPaused: isPaused,
-                        remainingSeconds: remainingSeconds,
-                        selectedMinutes: selectedMinutes
-                    )
-                    .frame(height: 200)
-                    .id(minute)
+    private var scrollPicker: some View {
+        GeometryReader { geo in
+            ScrollViewReader { proxy in
+                ScrollView(.vertical, showsIndicators: false) {
+                    LazyVStack(spacing: 0) {
+                        // Spacer at top - so first item can center
+                        Color.clear.frame(height: geo.size.height / 2 - 160)
+
+                        // 99 down to 1
+                        ForEach((1...maxMinutes).reversed(), id: \.self) { minute in
+                            numberCell(minute)
+                        }
+
+                        // Plus at bottom (stopwatch)
+                        plusCell
+
+                        // Spacer at bottom - extends well past bottom edge
+                        Color.clear.frame(height: geo.size.height / 2 + 200)
+                    }
+                    .scrollTargetLayout()
+                }
+                .scrollTargetBehavior(.viewAligned)
+                .scrollPosition(id: $scrollPosition, anchor: .center)
+                .onChange(of: scrollPosition) { _, newValue in
+                    if let value = newValue {
+                        selectedMinutes = value
+                        // If paused, update remaining time to new selection
+                        if timerState == .countdownPaused {
+                            remainingSeconds = value * 60
+                        }
+                        let gen = UISelectionFeedbackGenerator()
+                        gen.selectionChanged()
+                    }
+                }
+                .onAppear {
+                    // Scroll to correct position on appear
+                    let targetPosition = timerState == .countdownPaused ?
+                        max(1, (remainingSeconds + 59) / 60) : selectedMinutes
+
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                        proxy.scrollTo(targetPosition, anchor: .center)
+                        scrollPosition = targetPosition
+                    }
                 }
             }
-            .scrollTargetLayout()
         }
-        .scrollTargetBehavior(.viewAligned)
-        .scrollPosition(id: $scrollPosition)
-        .disabled(isRunning)
-        .onChange(of: scrollPosition) { oldValue, newValue in
-            if let newMinute = newValue, !isRunning {
-                selectedMinutes = newMinute
-                // If we scroll while paused, clear the pause state
-                if isPaused {
-                    isPaused = false
-                    remainingSeconds = 0
-                }
-                // Haptic feedback on scroll
-                let generator = UISelectionFeedbackGenerator()
-                generator.selectionChanged()
-            }
-        }
-        .onAppear {
-            scrollPosition = selectedMinutes
-        }
-        .frame(height: 400)
+    }
+
+    private func numberCell(_ minute: Int) -> some View {
+        let isSelected = scrollPosition == minute
+
+        return Text("\(minute)")
+            .font(.system(size: 220, weight: .bold))
+            .scaleEffect(x: 1.0, y: 1.5) // Stretch vertically even more
+            .foregroundStyle(isSelected ? Color.primary : Color.secondary.opacity(0.12))
+            .shadow(color: .black.opacity(isSelected ? 0.1 : 0.02), radius: 6, x: 3, y: 5)
+            .frame(height: 320)
+            .id(minute)
+    }
+
+    private var plusCell: some View {
+        let isSelected = scrollPosition == 0
+
+        return Image(systemName: "plus")
+            .font(.system(size: 140, weight: .bold))
+            // No stretch for plus icon - keep normal size
+            .foregroundStyle(isSelected ? Color.primary : Color.secondary.opacity(0.12))
+            .shadow(color: .black.opacity(isSelected ? 0.1 : 0.02), radius: 6, x: 3, y: 5)
+            .frame(height: 280)
+            .id(0)
+    }
+
+    // MARK: - Countdown Display
+
+    private var countdownDisplay: some View {
+        let mins = max(1, (remainingSeconds + 59) / 60)
+        let displayValue = min(mins, maxMinutes)
+
+        return Text("\(displayValue)")
+            .font(.system(size: 220, weight: .bold))
+            .scaleEffect(x: 1.0, y: 1.5)
+            .foregroundStyle(
+                timerState == .countdownRunning ?
+                AnyShapeStyle(LinearGradient(
+                    colors: [.blue, .cyan, .orange, .yellow],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )) :
+                AnyShapeStyle(Color.primary)
+            )
+            .shadow(color: .black.opacity(0.1), radius: 6, x: 3, y: 5)
     }
 
     // MARK: - Stopwatch Display
 
     private var stopwatchDisplay: some View {
-        VStack(spacing: 20) {
-            let minutes = stopwatchSeconds / 60
+        let minutes = stopwatchSeconds / 60
 
+        return Group {
             if minutes >= 1 {
-                // Show minutes as big number when over 1 minute
                 Text("\(minutes)")
-                    .font(.system(size: 180, weight: .thin, design: .rounded))
-                    .foregroundStyle(isRunning ? Color.white : Color.primary.opacity(0.8))
-                    .shadow(color: .black.opacity(0.15), radius: 10, x: 5, y: 8)
+                    .font(.system(size: 220, weight: .bold))
+                    .scaleEffect(x: 1.0, y: 1.5)
+                    .foregroundStyle(isRunning ? Color.white : Color.primary)
+                    .shadow(color: .black.opacity(0.1), radius: 6, x: 3, y: 5)
             } else {
-                // Show plus sign when under 1 minute
+                // Plus icon - no stretch
                 Image(systemName: "plus")
-                    .font(.system(size: 100, weight: .thin))
-                    .foregroundStyle(isRunning ? Color.white.opacity(0.9) : Color.primary.opacity(0.6))
-                    .shadow(color: .black.opacity(0.15), radius: 10, x: 5, y: 8)
+                    .font(.system(size: 140, weight: .bold))
+                    .foregroundStyle(isRunning ? Color.white : Color.primary)
+                    .shadow(color: .black.opacity(0.1), radius: 6, x: 3, y: 5)
             }
         }
-        .frame(height: 400)
-        .contentShape(Rectangle())
     }
 
     // MARK: - Bottom Time Display
 
     private var bottomTimeDisplay: some View {
         Group {
-            if isStopwatchMode {
-                // Stopwatch format: +hh:mm:ss
-                let hours = stopwatchSeconds / 3600
-                let minutes = (stopwatchSeconds % 3600) / 60
-                let seconds = stopwatchSeconds % 60
-
-                Text(String(format: "+%02d:%02d:%02d", hours, minutes, seconds))
-                    .font(.title2.weight(.medium).monospacedDigit())
-                    .foregroundStyle(isRunning ? .white : .primary)
-            } else if isRunning || isPaused {
-                // Timer format: mm:ss
-                let minutes = remainingSeconds / 60
-                let seconds = remainingSeconds % 60
-
-                // If remaining time > 99 minutes, show with hours
-                if remainingSeconds > maxMinutes * 60 {
-                    let hours = remainingSeconds / 3600
-                    let mins = (remainingSeconds % 3600) / 60
-                    let secs = remainingSeconds % 60
-                    Text(String(format: "%d:%02d:%02d", hours, mins, secs))
-                        .font(.title2.weight(.medium).monospacedDigit())
-                        .foregroundStyle(.primary)
+            switch timerState {
+            case .idle:
+                if selectedMinutes == 0 {
+                    Text("Tap to start stopwatch")
+                        .font(.title3.weight(.medium))
+                        .foregroundStyle(.primary.opacity(0.8))
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .glassEffect(.regular, in: Capsule())
                 } else {
-                    Text(String(format: "%02d:%02d", minutes, seconds))
-                        .font(.title2.weight(.medium).monospacedDigit())
-                        .foregroundStyle(.primary)
+                    Text("Tap to start")
+                        .font(.title3.weight(.medium))
+                        .foregroundStyle(.primary.opacity(0.8))
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .glassEffect(.regular, in: Capsule())
                 }
-            } else {
-                // Not running, not paused - show hint
-                Text("Tap to start")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+
+            case .countdownRunning, .countdownPaused:
+                let h = remainingSeconds / 3600
+                let m = (remainingSeconds % 3600) / 60
+                let s = remainingSeconds % 60
+
+                if h > 0 {
+                    Text(String(format: "%d:%02d:%02d", h, m, s))
+                        .font(.title2.weight(.semibold).monospacedDigit())
+                        .foregroundStyle(isRunning ? .white : .primary.opacity(0.8))
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .glassEffect(.regular, in: Capsule())
+                } else {
+                    Text(String(format: "%02d:%02d", m, s))
+                        .font(.title2.weight(.semibold).monospacedDigit())
+                        .foregroundStyle(isRunning ? .white : .primary.opacity(0.8))
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .glassEffect(.regular, in: Capsule())
+                }
+
+            case .stopwatchRunning, .stopwatchPaused:
+                let h = stopwatchSeconds / 3600
+                let m = (stopwatchSeconds % 3600) / 60
+                let s = stopwatchSeconds % 60
+                Text(String(format: "+%02d:%02d:%02d", h, m, s))
+                    .font(.title2.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(isRunning ? .white : .primary.opacity(0.8))
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+                    .glassEffect(.regular, in: Capsule())
+
+            case .completed:
+                EmptyView()
             }
         }
     }
 
-    // MARK: - Actions
+    // MARK: - Handle Tap
 
     private func handleTap() {
-        if showCompletionOverlay { return }
-
-        if isStopwatchMode {
-            // In stopwatch mode
-            if isRunning {
-                pauseStopwatch()
-            } else {
-                resumeStopwatch()
-            }
-        } else {
-            // In timer mode
-            if isRunning {
-                pauseTimer()
-            } else if isPaused {
-                resumeTimer()
-            } else {
-                startTimer()
-            }
+        switch timerState {
+        case .idle:
+            startTimer()
+        case .countdownRunning:
+            pauseCountdown()
+        case .countdownPaused:
+            resumeCountdown()
+        case .stopwatchRunning:
+            pauseStopwatch()
+        case .stopwatchPaused:
+            resumeStopwatch()
+        case .completed:
+            break
         }
     }
 
+    // MARK: - Timer Actions
+
     private func startTimer() {
-        remainingSeconds = selectedMinutes * 60
-        isRunning = true
-        isPaused = false
+        let gen = UIImpactFeedbackGenerator(style: .medium)
+        gen.impactOccurred()
+        AudioServicesPlaySystemSound(1104)
 
-        // Haptic and sound
-        let generator = UIImpactFeedbackGenerator(style: .medium)
-        generator.impactOccurred()
-        AudioServicesPlaySystemSound(1104) // Tock sound
-
-        startTimerLoop()
+        if selectedMinutes == 0 {
+            timerState = .stopwatchRunning
+            stopwatchSeconds = 0
+            startStopwatchLoop()
+        } else {
+            remainingSeconds = selectedMinutes * 60
+            timerState = .countdownRunning
+            startCountdownLoop()
+        }
     }
 
-    private func pauseTimer() {
-        isRunning = false
-        isPaused = true
+    private func startCountdownLoop() {
         timer?.invalidate()
-        timer = nil
-
-        let generator = UIImpactFeedbackGenerator(style: .light)
-        generator.impactOccurred()
-    }
-
-    private func resumeTimer() {
-        isRunning = true
-        isPaused = false
-
-        let generator = UIImpactFeedbackGenerator(style: .medium)
-        generator.impactOccurred()
-
-        startTimerLoop()
-    }
-
-    private func startTimerLoop() {
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
             if remainingSeconds > 0 {
                 remainingSeconds -= 1
             } else {
-                // Timer reached 0, switch to stopwatch mode
-                switchToStopwatchMode()
+                timer?.invalidate()
+                timer = nil
+                finishCountdown()
             }
         }
     }
 
-    private func switchToStopwatchMode() {
+    private func finishCountdown() {
+        // Only show completion if task selected
+        if selectedTask != nil {
+            withAnimation(.easeOut(duration: 0.3)) {
+                timerState = .completed
+            }
+        } else {
+            // No task - just reset
+            resetAll()
+        }
+    }
+
+    private func pauseCountdown() {
         timer?.invalidate()
         timer = nil
+        // Calculate current remaining minutes for scroll position
+        let currentMinutes = max(1, (remainingSeconds + 59) / 60)
+        selectedMinutes = currentMinutes
+        // Set timerState first, then scroll position will be handled by onAppear
+        timerState = .countdownPaused
+        // Delay setting scroll position to ensure view updates first
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            scrollPosition = currentMinutes
+        }
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+    }
 
-        isStopwatchMode = true
-        stopwatchSeconds = 0
-        isRunning = true
-        isPaused = false
-
-        // Haptic feedback for mode switch
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.warning)
-
-        // Start stopwatch
-        startStopwatchLoop()
+    private func resumeCountdown() {
+        timerState = .countdownRunning
+        startCountdownLoop()
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
     }
 
     private func startStopwatchLoop() {
+        timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
             stopwatchSeconds += 1
         }
     }
 
     private func pauseStopwatch() {
-        isRunning = false
-        isPaused = true
         timer?.invalidate()
         timer = nil
-
-        let generator = UIImpactFeedbackGenerator(style: .light)
-        generator.impactOccurred()
+        timerState = .stopwatchPaused
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
     private func resumeStopwatch() {
-        isRunning = true
-        isPaused = false
-
-        let generator = UIImpactFeedbackGenerator(style: .medium)
-        generator.impactOccurred()
-
+        timerState = .stopwatchRunning
         startStopwatchLoop()
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+    }
+
+    private func resetAll() {
+        timer?.invalidate()
+        timer = nil
+        timerState = .idle
+        selectedTask = nil
+        selectedMinutes = 1
+        scrollPosition = 1
+        remainingSeconds = 0
+        stopwatchSeconds = 0
+    }
+
+    // MARK: - Completion Overlay
+
+    private var completionOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.94)
+                .ignoresSafeArea()
+
+            VStack(spacing: 30) {
+                Spacer()
+
+                if let task = selectedTask {
+                    Text(task.title)
+                        .font(.title.weight(.bold))
+                        .foregroundStyle(.white)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 40)
+
+                    Text("Complete!")
+                        .font(.title3)
+                        .foregroundStyle(.white.opacity(0.7))
+                }
+
+                Spacer()
+
+                // Big exciting checkmark
+                ExcitingCheckmark(
+                    onComplete: {
+                        completeTask()
+                    }
+                )
+
+                Spacer()
+
+                Button {
+                    dismissWithoutComplete()
+                } label: {
+                    Text("Skip")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.white.opacity(0.5))
+                }
+                .padding(.bottom, 50)
+            }
+
+            // Confetti on top
+            ConfettiView()
+                .allowsHitTesting(false)
+        }
+    }
+
+    private func completeTask() {
+        guard let task = selectedTask else { return }
+
+        switch task.type {
+        case .assignment:
+            if let item = allAssignments.first(where: { $0.id == task.id }) {
+                item.toggleCompletion()
+            }
+        case .goal:
+            if let item = allGoals.first(where: { $0.id == task.id }) {
+                item.toggleCompletion()
+            }
+        case .habit:
+            if let item = allHabits.first(where: { $0.id == task.id }) {
+                item.completeToday()
+            }
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            resetAll()
+        }
+    }
+
+    private func dismissWithoutComplete() {
+        withAnimation(.easeOut(duration: 0.3)) {
+            resetAll()
+        }
     }
 
     // MARK: - Task Picker Sheet
@@ -369,159 +535,70 @@ struct FocusView: View {
     private var taskPickerSheet: some View {
         NavigationStack {
             List {
-                // Tasks with time units (prioritized)
                 let timeAssignments = assignments.filter { isTimeUnit($0.targetUnit) }
                 let timeGoals = goals.filter { isTimeUnit($0.targetUnit) }
                 let timeHabits = habits.filter { isTimeUnit($0.unit) }
 
                 if !timeAssignments.isEmpty || !timeGoals.isEmpty || !timeHabits.isEmpty {
                     Section("With Time Target") {
-                        ForEach(timeAssignments) { assignment in
-                            taskRow(
-                                title: assignment.title,
-                                subtitle: assignment.formattedTarget ?? "",
-                                icon: "doc.text",
-                                id: assignment.id,
-                                targetValue: assignment.targetValue,
-                                unit: assignment.targetUnit,
-                                type: .assignment
-                            )
+                        ForEach(timeAssignments) { a in
+                            taskRow(a.title, a.formattedTarget ?? "", "doc.text", a.id, a.targetValue, a.targetUnit, .assignment)
                         }
-
-                        ForEach(timeGoals) { goal in
-                            taskRow(
-                                title: goal.title,
-                                subtitle: goal.formattedTarget ?? "",
-                                icon: "flag",
-                                id: goal.id,
-                                targetValue: goal.targetValue,
-                                unit: goal.targetUnit,
-                                type: .goal
-                            )
+                        ForEach(timeGoals) { g in
+                            taskRow(g.title, g.formattedTarget ?? "", "flag", g.id, g.targetValue, g.targetUnit, .goal)
                         }
-
-                        ForEach(timeHabits) { habit in
-                            taskRow(
-                                title: habit.title,
-                                subtitle: habit.formattedTarget,
-                                icon: "repeat",
-                                id: habit.id,
-                                targetValue: habit.targetValue,
-                                unit: habit.unit,
-                                type: .habit
-                            )
+                        ForEach(timeHabits) { h in
+                            taskRow(h.title, h.formattedTarget, "repeat", h.id, h.targetValue, h.unit, .habit)
                         }
                     }
                 }
 
-                // Other tasks
                 let otherAssignments = assignments.filter { !isTimeUnit($0.targetUnit) }
                 let otherGoals = goals.filter { !isTimeUnit($0.targetUnit) }
                 let otherHabits = habits.filter { !isTimeUnit($0.unit) }
 
                 if !otherAssignments.isEmpty || !otherGoals.isEmpty || !otherHabits.isEmpty {
                     Section("Other Tasks") {
-                        ForEach(otherAssignments) { assignment in
-                            taskRow(
-                                title: assignment.title,
-                                subtitle: assignment.formattedTarget ?? "No time set",
-                                icon: "doc.text",
-                                id: assignment.id,
-                                targetValue: nil,
-                                unit: .none,
-                                type: .assignment
-                            )
+                        ForEach(otherAssignments) { a in
+                            taskRow(a.title, a.formattedTarget ?? "Set time", "doc.text", a.id, nil, .none, .assignment)
                         }
-
-                        ForEach(otherGoals) { goal in
-                            taskRow(
-                                title: goal.title,
-                                subtitle: goal.formattedTarget ?? "No time set",
-                                icon: "flag",
-                                id: goal.id,
-                                targetValue: nil,
-                                unit: .none,
-                                type: .goal
-                            )
+                        ForEach(otherGoals) { g in
+                            taskRow(g.title, g.formattedTarget ?? "Set time", "flag", g.id, nil, .none, .goal)
                         }
-
-                        ForEach(otherHabits) { habit in
-                            taskRow(
-                                title: habit.title,
-                                subtitle: habit.formattedTarget,
-                                icon: "repeat",
-                                id: habit.id,
-                                targetValue: nil,
-                                unit: .none,
-                                type: .habit
-                            )
+                        ForEach(otherHabits) { h in
+                            taskRow(h.title, h.formattedTarget, "repeat", h.id, nil, .none, .habit)
                         }
                     }
                 }
 
                 if assignments.isEmpty && goals.isEmpty && habits.isEmpty {
-                    ContentUnavailableView(
-                        "No Tasks",
-                        systemImage: "checklist",
-                        description: Text("Add assignments, goals, or habits to select them here.")
-                    )
+                    ContentUnavailableView("No Tasks", systemImage: "checklist", description: Text("Add tasks first."))
                 }
             }
             .navigationTitle("Select Task")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        showingTaskPicker = false
-                    }
-                }
-
-                if selectedTask != nil {
-                    ToolbarItem(placement: .destructiveAction) {
-                        Button("Clear") {
-                            selectedTask = nil
-                            showingTaskPicker = false
-                        }
-                    }
+                    Button("Cancel") { showingTaskPicker = false }
                 }
             }
         }
     }
 
-    private func taskRow(
-        title: String,
-        subtitle: String,
-        icon: String,
-        id: UUID,
-        targetValue: Double?,
-        unit: TargetUnit,
-        type: FocusTaskType
-    ) -> some View {
+    private func taskRow(_ title: String, _ subtitle: String, _ icon: String, _ id: UUID, _ value: Double?, _ unit: TargetUnit, _ type: FocusTaskType) -> some View {
         Button {
-            selectTask(
-                id: id,
-                title: title,
-                icon: icon,
-                targetValue: targetValue,
-                unit: unit,
-                type: type
-            )
+            selectTask(title: title, icon: icon, id: id, value: value, unit: unit, type: type)
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: icon)
                     .font(.title3)
                     .foregroundStyle(themeManager.accentColor)
-                    .frame(width: 30)
+                    .frame(width: 28)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.body)
-                        .foregroundStyle(.primary)
-
+                    Text(title).foregroundStyle(.primary)
                     if !subtitle.isEmpty {
-                        Text(subtitle)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        Text(subtitle).font(.caption).foregroundStyle(.secondary)
                     }
                 }
 
@@ -536,232 +613,91 @@ struct FocusView: View {
         .buttonStyle(.plain)
     }
 
-    private func selectTask(
-        id: UUID,
-        title: String,
-        icon: String,
-        targetValue: Double?,
-        unit: TargetUnit,
-        type: FocusTaskType
-    ) {
-        selectedTask = FocusTaskItem(
-            id: id,
-            title: title,
-            icon: icon,
-            targetValue: targetValue,
-            unit: unit,
-            type: type
-        )
-
-        // Auto-scroll to time if it's a time unit
-        if let value = targetValue, isTimeUnit(unit) {
-            let minutes = timeInMinutes(value: value, unit: unit)
-            selectedMinutes = min(minutes, maxMinutes)
-            scrollPosition = min(minutes, maxMinutes)
-        }
-
+    private func selectTask(title: String, icon: String, id: UUID, value: Double?, unit: TargetUnit, type: FocusTaskType) {
+        selectedTask = FocusTaskItem(id: id, title: title, icon: icon, type: type)
         showingTaskPicker = false
+
+        // If time-based, auto-start
+        if let v = value, isTimeUnit(unit) {
+            let mins = timeToMinutes(v, unit)
+            selectedMinutes = min(mins, maxMinutes)
+            scrollPosition = min(mins, maxMinutes)
+            remainingSeconds = selectedMinutes * 60
+
+            // Auto-start after small delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                timerState = .countdownRunning
+                startCountdownLoop()
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                AudioServicesPlaySystemSound(1104)
+            }
+        }
     }
 
     private func isTimeUnit(_ unit: TargetUnit) -> Bool {
         unit == .hour || unit == .minute || unit == .second
     }
 
-    private func timeInMinutes(value: Double, unit: TargetUnit) -> Int {
+    private func timeToMinutes(_ value: Double, _ unit: TargetUnit) -> Int {
         switch unit {
         case .hour: return Int(value * 60)
         case .minute: return Int(value)
         case .second: return max(1, Int(value / 60))
-        default: return 25
-        }
-    }
-
-    // MARK: - Completion Overlay
-
-    private var completionOverlayView: some View {
-        ZStack {
-            Color.black.opacity(0.9)
-                .ignoresSafeArea()
-
-            VStack(spacing: 30) {
-                ConfettiView()
-                    .allowsHitTesting(false)
-
-                Spacer()
-
-                if let task = selectedTask {
-                    Text(task.title)
-                        .font(.title2.weight(.semibold))
-                        .foregroundStyle(.white)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
-                }
-
-                Text("Time's Up!")
-                    .font(.largeTitle.weight(.bold))
-                    .foregroundStyle(.white)
-
-                // Long-press checkmark
-                FocusCompletionCheckmark(
-                    onComplete: {
-                        completeTask()
-                    },
-                    onDismiss: {
-                        dismissCompletion()
-                    }
-                )
-
-                Spacer()
-
-                Text("Hold checkmark to complete task")
-                    .font(.caption)
-                    .foregroundStyle(.white.opacity(0.6))
-                    .padding(.bottom, 40)
-            }
-        }
-    }
-
-    private func completeTask() {
-        if let task = selectedTask {
-            switch task.type {
-            case .assignment:
-                if let assignment = allAssignments.first(where: { $0.id == task.id }) {
-                    assignment.toggleCompletion()
-                }
-            case .goal:
-                if let goal = allGoals.first(where: { $0.id == task.id }) {
-                    goal.toggleCompletion()
-                }
-            case .habit:
-                if let habit = allHabits.first(where: { $0.id == task.id }) {
-                    habit.completeToday()
-                }
-            }
-        }
-
-        dismissCompletion()
-    }
-
-    private func dismissCompletion() {
-        withAnimation(.easeOut(duration: 0.3)) {
-            showCompletionOverlay = false
-        }
-
-        // Reset all state
-        timer?.invalidate()
-        timer = nil
-        selectedTask = nil
-        selectedMinutes = 25
-        scrollPosition = 25
-        remainingSeconds = 0
-        isRunning = false
-        isPaused = false
-        isStopwatchMode = false
-        stopwatchSeconds = 0
-    }
-}
-
-// MARK: - Minute Cell
-
-struct MinuteCell: View {
-    let minute: Int
-    let isRunning: Bool
-    let isPaused: Bool
-    let remainingSeconds: Int
-    let selectedMinutes: Int
-
-    private var displayMinute: Int {
-        if isRunning || isPaused {
-            return max(1, (remainingSeconds + 59) / 60)
-        }
-        return selectedMinutes
-    }
-
-    private var isCurrentMinute: Bool {
-        minute == displayMinute
-    }
-
-    private var isActive: Bool {
-        isRunning && isCurrentMinute
-    }
-
-    var body: some View {
-        Text("\(minute)")
-            .font(.system(size: 180, weight: .thin, design: .rounded))
-            .foregroundStyle(foregroundStyle)
-            .shadow(color: .black.opacity(isCurrentMinute ? 0.15 : 0.05), radius: 10, x: 5, y: 8)
-    }
-
-    @ViewBuilder
-    private var foregroundStyle: some ShapeStyle {
-        if isActive {
-            LinearGradient(
-                colors: [.blue, .cyan, .orange, .yellow],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        } else if isCurrentMinute {
-            Color.primary.opacity(0.8)
-        } else {
-            Color.secondary.opacity(0.2)
+        default: return 1
         }
     }
 }
 
 // MARK: - Focus Task Item
 
-struct FocusTaskItem: Identifiable, Equatable {
+struct FocusTaskItem: Identifiable {
     let id: UUID
     let title: String
     let icon: String
-    let targetValue: Double?
-    let unit: TargetUnit
     let type: FocusTaskType
-
-    static func == (lhs: FocusTaskItem, rhs: FocusTaskItem) -> Bool {
-        lhs.id == rhs.id
-    }
 }
 
 enum FocusTaskType {
-    case assignment
-    case goal
-    case habit
+    case assignment, goal, habit
 }
 
-// MARK: - Focus Completion Checkmark
+// MARK: - Exciting Checkmark (Matches Habits Animation)
 
-struct FocusCompletionCheckmark: View {
+struct ExcitingCheckmark: View {
     let onComplete: () -> Void
-    let onDismiss: () -> Void
 
+    // Long press animation states (matching ConcentricHabitCard)
     @State private var isHolding = false
     @State private var holdProgress: CGFloat = 0
     @State private var completionBounce = false
     @State private var showRipple = false
     @State private var hapticTimer: Timer?
+    @State private var holdStartTime: Date?
 
-    private let holdDuration: Double = 1.2
-    private let checkmarkSize: CGFloat = 100
+    private let holdDuration: Double = 1.2 // Same as habits
+    private let checkmarkSize: CGFloat = 120
     private let minimumHoldToShowProgress: Double = 0.06
 
     var body: some View {
         ZStack {
             // Background ring
             Circle()
-                .stroke(Color.white.opacity(0.2), lineWidth: 4)
+                .stroke(Color.white.opacity(0.15), lineWidth: 4)
                 .frame(width: checkmarkSize + 16, height: checkmarkSize + 16)
 
-            // Progress ring
+            // Progress ring (fills during hold) - only show if actually holding
             if holdProgress > 0 && isHolding {
                 Circle()
                     .trim(from: 0, to: holdProgress)
-                    .stroke(Color.green, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                    .stroke(
+                        Color.green,
+                        style: StrokeStyle(lineWidth: 4, lineCap: .round)
+                    )
                     .frame(width: checkmarkSize + 16, height: checkmarkSize + 16)
                     .rotationEffect(.degrees(-90))
             }
 
-            // Ripple effect
+            // Ripple effect on completion
             if showRipple {
                 Circle()
                     .stroke(Color.green.opacity(0.6), lineWidth: 4)
@@ -771,23 +707,26 @@ struct FocusCompletionCheckmark: View {
             }
 
             // Checkmark icon
-            Image(systemName: "checkmark.circle")
+            Image(systemName: completionBounce ? "checkmark.circle.fill" : "circle")
                 .font(.system(size: checkmarkSize, weight: .medium))
                 .foregroundStyle(
-                    isHolding && holdProgress > 0 ?
-                    Color.green.opacity(0.4 + holdProgress * 0.6) :
-                    Color.white.opacity(0.8)
+                    completionBounce ? .green :
+                    (isHolding && holdProgress > 0) ? .green.opacity(0.4 + holdProgress * 0.6) :
+                    .white.opacity(0.5)
                 )
+                .contentTransition(.symbolEffect(.replace.magic(fallback: .replace)))
                 .scaleEffect(completionBounce ? 1.35 : (isHolding ? 1.0 + holdProgress * 0.2 : 1.0))
                 .rotationEffect(.degrees(completionBounce ? 10 : (isHolding ? holdProgress * 8 : 0)))
         }
         .contentShape(Circle())
         .onLongPressGesture(minimumDuration: holdDuration, maximumDistance: 50) {
-            completeAction()
+            // Long press completed
+            completeCheckmark()
         } onPressingChanged: { pressing in
             if pressing {
                 startHolding()
             } else {
+                // Released before completion
                 if !completionBounce {
                     cancelHolding()
                 }
@@ -795,23 +734,30 @@ struct FocusCompletionCheckmark: View {
         }
     }
 
+    // MARK: - Holding Logic (matching ConcentricHabitCard)
+
     private func startHolding() {
         guard !isHolding else { return }
         isHolding = true
+        holdStartTime = Date()
 
+        // Delay showing progress slightly to avoid flash on quick tap
         DispatchQueue.main.asyncAfter(deadline: .now() + minimumHoldToShowProgress) {
             guard isHolding else { return }
 
+            // Start progressive animation
             withAnimation(.linear(duration: holdDuration - minimumHoldToShowProgress)) {
                 holdProgress = 1.0
             }
 
+            // Start haptic feedback timer
             startHapticFeedback()
         }
     }
 
     private func cancelHolding() {
         isHolding = false
+        holdStartTime = nil
         hapticTimer?.invalidate()
         hapticTimer = nil
 
@@ -820,16 +766,13 @@ struct FocusCompletionCheckmark: View {
         }
     }
 
-    private func completeAction() {
+    private func completeCheckmark() {
         hapticTimer?.invalidate()
         hapticTimer = nil
         isHolding = false
+        holdStartTime = nil
 
-        withAnimation(.easeOut(duration: 0.15)) {
-            holdProgress = 0
-        }
-
-        // Celebration haptic and sound
+        // Final celebration haptic and sound
         let heavyFeedback = UIImpactFeedbackGenerator(style: .heavy)
         heavyFeedback.impactOccurred()
 
@@ -839,28 +782,36 @@ struct FocusCompletionCheckmark: View {
             AudioServicesPlaySystemSound(1407)
         }
 
-        // Bounce animation
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
-                completionBounce = true
-            }
-
-            withAnimation(.easeOut(duration: 0.6)) {
-                showRipple = true
-            }
+        // Bounce animation (same as habits checkmarks)
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
+            completionBounce = true
         }
 
-        // Call completion after animation
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+        // Ripple effect
+        withAnimation(.easeOut(duration: 0.6)) {
+            showRipple = true
+        }
+
+        // Reset after animation (same timing as habits checkmarks)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+            withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
+                holdProgress = 0
+            }
+            showRipple = false
+
+            // Trigger the actual completion
             onComplete()
         }
     }
 
+    // MARK: - Progressive Haptic Feedback (matching ConcentricHabitCard)
+
     private func startHapticFeedback() {
         var pulseCount = 0
-        let totalPulses = 16
+        let totalPulses = 16 // Same as habits
         let interval = (holdDuration - minimumHoldToShowProgress) / Double(totalPulses)
 
+        // First haptic immediately
         let initialGenerator = UIImpactFeedbackGenerator(style: .light)
         initialGenerator.impactOccurred()
 
@@ -872,6 +823,7 @@ struct FocusCompletionCheckmark: View {
 
             pulseCount += 1
 
+            // Progressively stronger haptics - ramps up intensity
             let style: UIImpactFeedbackGenerator.FeedbackStyle
             let intensity: CGFloat
 
