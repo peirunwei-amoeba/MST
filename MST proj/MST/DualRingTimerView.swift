@@ -15,59 +15,71 @@ struct DualRingTimerView: View {
     let remainingSeconds: Int
     let accentColor: Color
 
-    // Ring dimensions - fused appearance (minimal gap)
-    private let outerRingWidth: CGFloat = 20
+    // Time display in center
+    let displayTime: String
+    let timeLabel: String
+
+    // Ring dimensions - fused appearance
+    private let outerRingWidth: CGFloat = 22
     private let innerRingWidth: CGFloat = 14
-    private let ringGap: CGFloat = 2  // Minimal gap for fused look
+    private let ringGap: CGFloat = 0  // No gap for truly fused look
 
     // Drag state
     @State private var isDraggingOuter: Bool = false
     @State private var isDraggingInner: Bool = false
     @State private var lastHapticMinute: Int = -1
-    @State private var lastHapticHour: Int = -1
+    @State private var lastHapticSnap: Int = -1
+    @State private var dragLock: DragLock = .none
 
-    // Computed ring progress
+    private enum DragLock {
+        case none
+        case outer  // Locked to minute ring
+        case inner  // Locked to hour ring
+    }
+
+    // Computed ring progress (starts from top, goes clockwise)
     private var minuteProgress: Double {
         Double(selectedMinutes) / 60.0
     }
 
     private var hourProgress: Double {
-        // Total time in minutes / max time (239 minutes = 3h59m)
+        // Hours progress (0-3 hours mapped to full circle)
         let totalMinutes = selectedHours * 60 + selectedMinutes
-        return min(1.0, Double(totalMinutes) / 239.0)
+        return min(1.0, Double(totalMinutes) / 180.0)  // 3 hours = 180 mins
     }
 
     var body: some View {
         GeometryReader { geometry in
             let size = min(geometry.size.width, geometry.size.height)
             let center = CGPoint(x: size / 2, y: size / 2)
-            let outerRadius = (size / 2) - outerRingWidth / 2 - 10
-            let innerRadius = outerRadius - outerRingWidth / 2 - ringGap - innerRingWidth / 2
+            let outerRadius = (size / 2) - 30  // Leave room for labels
+            let innerRadius = outerRadius - outerRingWidth / 2 - innerRingWidth / 2 - ringGap
 
             ZStack {
-                // MARK: - Background Tracks (Fused appearance)
+                // MARK: - Background Track (Single fused track)
 
-                // Combined track background for fused look
-                let combinedWidth = outerRingWidth + ringGap + innerRingWidth
-                let combinedRadius = (outerRadius + innerRadius) / 2
+                // Combined background track for fused appearance
+                Circle()
+                    .stroke(
+                        Color.secondary.opacity(0.15),
+                        lineWidth: outerRingWidth + innerRingWidth + ringGap
+                    )
+                    .frame(width: (outerRadius + innerRadius), height: (outerRadius + innerRadius))
+
+                // MARK: - Hour Ring (Inner) - Progress Arc
 
                 Circle()
-                    .stroke(Color.secondary.opacity(0.08), lineWidth: combinedWidth)
-                    .frame(width: combinedRadius * 2, height: combinedRadius * 2)
-
-                // Outer ring track (minutes) - slightly more visible
-                Circle()
-                    .stroke(Color.secondary.opacity(0.12), lineWidth: outerRingWidth)
-                    .frame(width: outerRadius * 2, height: outerRadius * 2)
-
-                // Inner ring track (hours)
-                Circle()
-                    .stroke(Color.secondary.opacity(0.1), lineWidth: innerRingWidth)
+                    .trim(from: 0, to: hourProgress)
+                    .stroke(
+                        accentColor.opacity(0.5),
+                        style: StrokeStyle(lineWidth: innerRingWidth, lineCap: .round)
+                    )
                     .frame(width: innerRadius * 2, height: innerRadius * 2)
+                    .rotationEffect(.degrees(-90))
+                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: hourProgress)
 
-                // MARK: - Progress Arcs
+                // MARK: - Minute Ring (Outer) - Progress Arc
 
-                // Outer ring progress (minutes) - starts from top
                 Circle()
                     .trim(from: 0, to: minuteProgress)
                     .stroke(
@@ -78,66 +90,106 @@ struct DualRingTimerView: View {
                     .rotationEffect(.degrees(-90))
                     .animation(.spring(response: 0.3, dampingFraction: 0.7), value: minuteProgress)
 
-                // Inner ring progress (hours) - gradient effect
-                Circle()
-                    .trim(from: 0, to: hourProgress)
-                    .stroke(
-                        LinearGradient(
-                            colors: [accentColor.opacity(0.6), accentColor],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        ),
-                        style: StrokeStyle(lineWidth: innerRingWidth, lineCap: .round)
-                    )
-                    .frame(width: innerRadius * 2, height: innerRadius * 2)
-                    .rotationEffect(.degrees(-90))
-                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: hourProgress)
+                // MARK: - Tick Marks for Minutes (every 5 minutes, small lines)
 
-                // MARK: - Tick Marks
+                ForEach(0..<60, id: \.self) { minute in
+                    let isMajor = minute % 15 == 0
+                    let isMedium = minute % 5 == 0 && !isMajor
 
-                // Minute tick marks (every 15 minutes)
-                ForEach([0, 15, 30, 45], id: \.self) { minute in
-                    let angle = Double(minute) / 60.0 * 360.0 - 90
-                    let tickLength: CGFloat = minute == 0 ? 12 : 8
+                    if isMajor || isMedium {
+                        let angle = Double(minute) / 60.0 * 360.0 - 90
+                        let tickLength: CGFloat = isMajor ? 10 : 6
+                        let tickWidth: CGFloat = isMajor ? 2 : 1.5
 
-                    // Tick mark
-                    Rectangle()
-                        .fill(Color.secondary.opacity(0.4))
-                        .frame(width: 2, height: tickLength)
-                        .offset(y: -outerRadius - outerRingWidth / 2 - 4)
-                        .rotationEffect(.degrees(angle))
-
-                    // Label
-                    let labelRadius = outerRadius + outerRingWidth / 2 + 20
-                    let labelAngle = (angle + 90) * .pi / 180
-                    let labelX = cos(labelAngle) * labelRadius
-                    let labelY = sin(labelAngle) * labelRadius
-
-                    Text(minute == 0 ? "60" : "\(minute)")
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(Color.secondary.opacity(0.6))
-                        .position(x: size / 2 + labelX, y: size / 2 + labelY)
+                        Rectangle()
+                            .fill(Color.secondary.opacity(isMajor ? 0.4 : 0.25))
+                            .frame(width: tickWidth, height: tickLength)
+                            .offset(y: -(outerRadius + outerRingWidth / 2 + 4))
+                            .rotationEffect(.degrees(angle))
+                    }
                 }
 
-                // MARK: - Drag Handles
+                // MARK: - Labels (60 at top, 15 at right, 30 at bottom, 45 at left)
 
-                // Minute handle (outer ring)
+                // Position labels correctly: 60 at top (0°), 15 at right (90°), 30 at bottom (180°), 45 at left (270°)
+                let labelRadius = outerRadius + outerRingWidth / 2 + 22
+
+                // 60 (top - 12 o'clock)
+                Text("60")
+                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color.secondary.opacity(0.6))
+                    .position(x: size / 2, y: size / 2 - labelRadius)
+
+                // 15 (right - 3 o'clock)
+                Text("15")
+                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color.secondary.opacity(0.6))
+                    .position(x: size / 2 + labelRadius, y: size / 2)
+
+                // 30 (bottom - 6 o'clock)
+                Text("30")
+                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color.secondary.opacity(0.6))
+                    .position(x: size / 2, y: size / 2 + labelRadius)
+
+                // 45 (left - 9 o'clock)
+                Text("45")
+                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color.secondary.opacity(0.6))
+                    .position(x: size / 2 - labelRadius, y: size / 2)
+
+                // MARK: - Drag Handles (subtle design)
+
                 if !isRunning || isPaused {
-                    let minuteAngle = minuteProgress * 360.0 - 90
-                    let handleX = cos(minuteAngle * .pi / 180) * outerRadius
-                    let handleY = sin(minuteAngle * .pi / 180) * outerRadius
+                    // Minute handle (outer ring) - subtle white circle with accent border
+                    let minuteAngle = (minuteProgress * 360.0 - 90) * .pi / 180
+                    let minuteHandleX = cos(minuteAngle) * outerRadius
+                    let minuteHandleY = sin(minuteAngle) * outerRadius
 
                     Circle()
                         .fill(Color.white)
-                        .frame(width: outerRingWidth + 8, height: outerRingWidth + 8)
-                        .shadow(color: accentColor.opacity(0.3), radius: 4, x: 0, y: 2)
+                        .frame(width: outerRingWidth + 4, height: outerRingWidth + 4)
                         .overlay(
                             Circle()
-                                .stroke(accentColor, lineWidth: 3)
+                                .stroke(accentColor, lineWidth: 2)
                         )
-                        .position(x: size / 2 + handleX, y: size / 2 + handleY)
-                        .scaleEffect(isDraggingOuter ? 1.15 : 1.0)
+                        .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
+                        .position(x: size / 2 + minuteHandleX, y: size / 2 + minuteHandleY)
+                        .scaleEffect(isDraggingOuter ? 1.1 : 1.0)
                         .animation(.spring(response: 0.2), value: isDraggingOuter)
+
+                    // Hour handle (inner ring) - smaller, more subtle
+                    let hourAngle = (hourProgress * 360.0 - 90) * .pi / 180
+                    let hourHandleX = cos(hourAngle) * innerRadius
+                    let hourHandleY = sin(hourAngle) * innerRadius
+
+                    Circle()
+                        .fill(Color.white)
+                        .frame(width: innerRingWidth + 4, height: innerRingWidth + 4)
+                        .overlay(
+                            Circle()
+                                .stroke(accentColor.opacity(0.7), lineWidth: 1.5)
+                        )
+                        .shadow(color: Color.black.opacity(0.08), radius: 1, x: 0, y: 1)
+                        .position(x: size / 2 + hourHandleX, y: size / 2 + hourHandleY)
+                        .scaleEffect(isDraggingInner ? 1.1 : 1.0)
+                        .animation(.spring(response: 0.2), value: isDraggingInner)
+                }
+
+                // MARK: - Center Time Display
+
+                VStack(spacing: 2) {
+                    Text(displayTime)
+                        .font(.system(size: selectedHours > 0 || isRunning ? 52 : 72, weight: .ultraLight, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(.primary)
+                        .contentTransition(.numericText())
+                        .animation(.spring(response: 0.3), value: displayTime)
+
+                    Text(timeLabel)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .tracking(2)
                 }
             }
             .frame(width: size, height: size)
@@ -151,6 +203,7 @@ struct DualRingTimerView: View {
                     .onEnded { _ in
                         isDraggingOuter = false
                         isDraggingInner = false
+                        dragLock = .none  // Release lock when finger lifts
                     }
             )
         }
@@ -164,18 +217,28 @@ struct DualRingTimerView: View {
         let dy = location.y - center.y
         let distance = sqrt(dx * dx + dy * dy)
 
-        // Calculate angle from top (0 degrees = 12 o'clock)
-        var angle = atan2(dy, dx) * 180 / .pi + 90
+        // Calculate angle from top (0 degrees = 12 o'clock), clockwise
+        var angle = atan2(dx, -dy) * 180 / .pi
         if angle < 0 { angle += 360 }
 
-        // Determine which ring we're dragging based on distance
-        let outerRingInner = outerRadius - outerRingWidth
-        let outerRingOuter = outerRadius + outerRingWidth
-        let innerRingInner = innerRadius - innerRingWidth
-        let innerRingOuter = innerRadius + innerRingWidth
+        // Define zones
+        let outerZone = outerRadius - outerRingWidth...outerRadius + outerRingWidth + 15
+        let innerZone = innerRadius - innerRingWidth - 10...innerRadius + innerRingWidth + 10
+        let centerZone = 0.0...(innerRadius - innerRingWidth - 10)
 
-        if distance >= outerRingInner - 20 && distance <= outerRingOuter + 20 {
-            // Dragging outer ring (minutes)
+        // Determine initial lock if not already locked
+        if dragLock == .none {
+            if outerZone.contains(distance) {
+                dragLock = .outer
+            } else if innerZone.contains(distance) || centerZone.contains(distance) {
+                dragLock = .inner
+            }
+        }
+
+        // Handle drag based on lock (not current position)
+        switch dragLock {
+        case .outer:
+            // Locked to outer ring (minutes)
             isDraggingOuter = true
             isDraggingInner = false
 
@@ -191,15 +254,16 @@ struct DualRingTimerView: View {
                     lastHapticMinute = clampedMinutes
                 }
             }
-        } else if distance >= innerRingInner - 15 && distance <= innerRingOuter + 15 {
-            // Dragging inner ring (hours with 15-min snapping)
+
+        case .inner:
+            // Locked to inner ring (hours with 15-min snapping)
             isDraggingOuter = false
             isDraggingInner = true
 
-            // Convert angle to total minutes (0-239 for 3h59m max)
-            let rawTotalMinutes = (angle / 360.0) * 239.0
+            // Convert angle to total minutes (0-180 for 3 hours max)
+            let rawTotalMinutes = (angle / 360.0) * 180.0
             let snappedMinutes = snapToInterval(rawTotalMinutes, interval: 15)
-            let clampedMinutes = max(0, min(239, snappedMinutes))
+            let clampedMinutes = max(0, min(180, snappedMinutes))
 
             let newHours = clampedMinutes / 60
             let newMins = clampedMinutes % 60
@@ -211,27 +275,14 @@ struct DualRingTimerView: View {
                 }
 
                 // Stronger haptic for snapping
-                if newHours != lastHapticHour || (clampedMinutes % 15 == 0) {
+                if clampedMinutes != lastHapticSnap {
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    lastHapticHour = newHours
+                    lastHapticSnap = clampedMinutes
                 }
             }
-        } else if distance < innerRingInner - 15 {
-            // Inside inner ring - fine-tune minutes
-            isDraggingOuter = true
-            isDraggingInner = false
 
-            let newMinutes = Int((angle / 360.0) * 60.0)
-            let clampedMinutes = max(0, min(59, newMinutes))
-
-            if clampedMinutes != selectedMinutes {
-                selectedMinutes = clampedMinutes
-
-                if clampedMinutes != lastHapticMinute {
-                    UISelectionFeedbackGenerator().selectionChanged()
-                    lastHapticMinute = clampedMinutes
-                }
-            }
+        case .none:
+            break
         }
     }
 
@@ -243,8 +294,8 @@ struct DualRingTimerView: View {
 
 #Preview {
     struct PreviewWrapper: View {
-        @State private var minutes = 25
-        @State private var hours = 1
+        @State private var minutes = 23
+        @State private var hours = 0
 
         var body: some View {
             VStack {
@@ -254,14 +305,13 @@ struct DualRingTimerView: View {
                     isRunning: false,
                     isPaused: false,
                     remainingSeconds: 0,
-                    accentColor: .purple
+                    accentColor: .purple,
+                    displayTime: "\(minutes)",
+                    timeLabel: "MINS"
                 )
-                .frame(width: 280, height: 280)
-
-                Text("\(hours)h \(minutes)m")
-                    .font(.title)
-                    .padding()
+                .frame(width: 320, height: 320)
             }
+            .padding()
         }
     }
 

@@ -128,7 +128,7 @@ struct FocusView: View {
         if isOverMaxTime && !isRunning {
             let hours = exactTimeMinutes / 60
             let mins = exactTimeMinutes % 60
-            return "\(hours)h \(mins)m"
+            return "\(hours):\(String(format: "%02d", mins))"
         } else if isRunning || isPaused {
             let hours = remainingSeconds / 3600
             let mins = (remainingSeconds % 3600) / 60
@@ -136,11 +136,11 @@ struct FocusView: View {
             if hours > 0 {
                 return String(format: "%d:%02d:%02d", hours, mins, secs)
             } else {
-                return String(format: "%02d:%02d", mins, secs)
+                return String(format: "%d:%02d", mins, secs)
             }
         } else {
             if selectedHours > 0 {
-                return String(format: "%d:%02d", selectedHours, selectedMinutes)
+                return "\(selectedHours):\(String(format: "%02d", selectedMinutes))"
             } else {
                 return "\(selectedMinutes)"
             }
@@ -149,9 +149,9 @@ struct FocusView: View {
 
     private var timeLabel: String {
         if isOverMaxTime && !isRunning {
-            return "TOTAL"
+            return "HOURS"
         } else if isRunning || isPaused {
-            return "REMAINING"
+            return ""
         } else if selectedHours > 0 {
             return "HOURS"
         } else {
@@ -165,50 +165,36 @@ struct FocusView: View {
             themeManager.backgroundColor
                 .ignoresSafeArea()
 
-            VStack(spacing: 24) {
-                // Task picker button
+            VStack(spacing: 0) {
+                // Task picker button at top
                 taskPickerButton
-                    .padding(.top, 20)
+                    .padding(.top, 16)
 
                 Spacer()
 
-                // Dual ring timer
+                // Dual ring timer with time display inside
                 DualRingTimerView(
                     selectedMinutes: $selectedMinutes,
                     selectedHours: $selectedHours,
                     isRunning: isRunning,
                     isPaused: isPaused,
                     remainingSeconds: remainingSeconds,
-                    accentColor: themeManager.accentColor
+                    accentColor: themeManager.accentColor,
+                    displayTime: displayTime,
+                    timeLabel: timeLabel
                 )
-                .frame(width: 280, height: 280)
+                .frame(width: 320, height: 320)
                 .disabled(isRunning && !isPaused)
-
-                // Center time display
-                VStack(spacing: 4) {
-                    Text(displayTime)
-                        .font(.system(size: selectedHours > 0 || isRunning ? 56 : 72, weight: .ultraLight, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundStyle(.primary)
-                        .contentTransition(.numericText())
-                        .animation(.spring(response: 0.3), value: displayTime)
-
-                    Text(timeLabel)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .tracking(2)
-                }
-                .padding(.top, -60)
 
                 Spacer()
 
                 // Control buttons
                 controlButtons
-                    .padding(.bottom, 40)
+                    .padding(.bottom, 32)
             }
-            .padding(.horizontal, 24)
+            .padding(.horizontal, 20)
 
-            // Task picker sheet
+            // Task picker overlay
             if showTaskPicker {
                 FocusTaskPickerView(
                     isPresented: $showTaskPicker,
@@ -220,7 +206,7 @@ struct FocusView: View {
                         selectTask(task)
                     }
                 )
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
 
             // Completion overlay
@@ -280,8 +266,8 @@ struct FocusView: View {
                     .foregroundStyle(.secondary)
                     .rotationEffect(.degrees(showTaskPicker ? 180 : 0))
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 14)
             .glassEffect(.regular)
             .clipShape(Capsule())
         }
@@ -299,9 +285,9 @@ struct FocusView: View {
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 20, weight: .semibold))
+                        .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(.primary)
-                        .frame(width: 56, height: 56)
+                        .frame(width: 52, height: 52)
                         .glassEffect(.regular)
                         .clipShape(Circle())
                 }
@@ -318,16 +304,16 @@ struct FocusView: View {
                     startTimer()
                 }
             } label: {
-                HStack(spacing: 8) {
+                HStack(spacing: 10) {
                     Image(systemName: isRunning ? "pause.fill" : "play.fill")
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(.system(size: 16, weight: .semibold))
                         .contentTransition(.symbolEffect(.replace))
 
                     Text(isRunning ? "Pause" : (isPaused ? "Resume" : "Start"))
                         .font(.body.weight(.semibold))
                 }
                 .foregroundStyle(.primary)
-                .padding(.horizontal, 32)
+                .padding(.horizontal, 36)
                 .padding(.vertical, 16)
                 .glassEffect(.regular)
                 .clipShape(Capsule())

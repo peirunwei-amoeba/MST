@@ -48,123 +48,129 @@ struct FocusTaskPickerView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            // Dimmed background
-            Color.black.opacity(0.3)
+        ZStack {
+            // Dimmed background - tap to dismiss
+            Color.black.opacity(0.4)
                 .ignoresSafeArea()
                 .onTapGesture {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                        isPresented = false
-                    }
+                    dismissPicker()
                 }
 
-            // Floating picker card
+            // Bottom sheet card
             VStack(spacing: 0) {
-                // Handle bar
-                Capsule()
-                    .fill(Color.secondary.opacity(0.3))
-                    .frame(width: 36, height: 5)
-                    .padding(.top, 12)
-                    .padding(.bottom, 8)
+                Spacer()
 
-                // Header
-                HStack {
-                    Text("Select Task")
-                        .font(.headline)
-                        .foregroundStyle(.primary)
+                VStack(spacing: 0) {
+                    // Handle bar
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(Color.secondary.opacity(0.4))
+                        .frame(width: 40, height: 5)
+                        .padding(.top, 12)
+                        .padding(.bottom, 16)
 
-                    Spacer()
+                    // Header
+                    HStack {
+                        Text("Select Task")
+                            .font(.title3.weight(.semibold))
+                            .foregroundStyle(.primary)
 
-                    if selectedTask != nil {
-                        Button {
-                            withAnimation(.spring(response: 0.3)) {
-                                selectedTask = nil
+                        Spacer()
+
+                        if selectedTask != nil {
+                            Button {
+                                withAnimation(.spring(response: 0.3)) {
+                                    selectedTask = nil
+                                }
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            } label: {
+                                Text("Clear")
+                                    .font(.subheadline.weight(.medium))
+                                    .foregroundStyle(themeManager.accentColor)
                             }
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        } label: {
-                            Text("Clear")
-                                .font(.subheadline.weight(.medium))
-                                .foregroundStyle(themeManager.accentColor)
                         }
                     }
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 16)
 
-                    Button {
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                            isPresented = false
-                        }
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.title2)
+                    // Search bar
+                    HStack(spacing: 10) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 15))
                             .foregroundStyle(.secondary)
+
+                        TextField("Search tasks...", text: $searchText)
+                            .font(.body)
                     }
-                }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 12)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 11)
+                    .background(Color(.systemGray6))
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 16)
 
-                // Search bar
-                HStack(spacing: 10) {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 16))
-                        .foregroundStyle(.secondary)
+                    // Task list
+                    ScrollView {
+                        VStack(spacing: 20) {
+                            if !hasAnyTasks {
+                                emptyStateView
+                            } else if !hasFilteredTasks {
+                                noResultsView
+                            } else {
+                                // Assignments section
+                                if !filteredAssignments.isEmpty {
+                                    taskSection(
+                                        title: "Assignments",
+                                        icon: "book.fill",
+                                        color: .blue,
+                                        tasks: filteredAssignments.map { .assignment($0) }
+                                    )
+                                }
 
-                    TextField("Search tasks...", text: $searchText)
-                        .font(.body)
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background(Color.secondary.opacity(0.1))
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .padding(.horizontal, 20)
-                .padding(.bottom, 16)
+                                // Goals section
+                                if !filteredGoals.isEmpty {
+                                    taskSection(
+                                        title: "Project Goals",
+                                        icon: "flag.fill",
+                                        color: .purple,
+                                        tasks: filteredGoals.map { .goal($0) }
+                                    )
+                                }
 
-                // Task list
-                ScrollView {
-                    VStack(spacing: 16) {
-                        if !hasAnyTasks {
-                            emptyStateView
-                        } else if !hasFilteredTasks {
-                            noResultsView
-                        } else {
-                            // Assignments section
-                            if !filteredAssignments.isEmpty {
-                                taskSection(
-                                    title: "Assignments",
-                                    icon: "book.fill",
-                                    color: .blue,
-                                    tasks: filteredAssignments.map { .assignment($0) }
-                                )
-                            }
-
-                            // Goals section
-                            if !filteredGoals.isEmpty {
-                                taskSection(
-                                    title: "Project Goals",
-                                    icon: "flag.fill",
-                                    color: .purple,
-                                    tasks: filteredGoals.map { .goal($0) }
-                                )
-                            }
-
-                            // Habits section
-                            if !filteredHabits.isEmpty {
-                                taskSection(
-                                    title: "Habits",
-                                    icon: "flame.fill",
-                                    color: .orange,
-                                    tasks: filteredHabits.map { .habit($0) }
-                                )
+                                // Habits section
+                                if !filteredHabits.isEmpty {
+                                    taskSection(
+                                        title: "Habits",
+                                        icon: "flame.fill",
+                                        color: .orange,
+                                        tasks: filteredHabits.map { .habit($0) }
+                                    )
+                                }
                             }
                         }
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 40)
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 20)
+                    .frame(maxHeight: 400)
                 }
-                .frame(maxHeight: 400)
+                .glassEffect(.regular)
+                .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+                .padding(.horizontal, 8)
+                .padding(.bottom, 8)
             }
-            .glassEffect(.regular)
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .padding(.horizontal, 16)
-            .padding(.bottom, 8)
+        }
+        .gesture(
+            DragGesture()
+                .onEnded { value in
+                    if value.translation.height > 100 {
+                        dismissPicker()
+                    }
+                }
+        )
+    }
+
+    private func dismissPicker() {
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+            isPresented = false
         }
     }
 
@@ -172,6 +178,7 @@ struct FocusTaskPickerView: View {
 
     private func taskSection(title: String, icon: String, color: Color, tasks: [FocusTask]) -> some View {
         VStack(alignment: .leading, spacing: 10) {
+            // Section header
             HStack(spacing: 6) {
                 Image(systemName: icon)
                     .font(.system(size: 12, weight: .semibold))
@@ -180,15 +187,25 @@ struct FocusTaskPickerView: View {
                 Text(title)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.secondary)
+
+                Text("(\(tasks.count))")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
             }
             .padding(.horizontal, 4)
 
-            VStack(spacing: 2) {
-                ForEach(tasks) { task in
+            // Task rows
+            VStack(spacing: 0) {
+                ForEach(Array(tasks.enumerated()), id: \.element.id) { index, task in
                     taskRow(task)
+
+                    if index < tasks.count - 1 {
+                        Divider()
+                            .padding(.leading, 52)
+                    }
                 }
             }
-            .background(Color.secondary.opacity(0.08))
+            .background(Color(.secondarySystemGroupedBackground))
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
     }
@@ -198,12 +215,19 @@ struct FocusTaskPickerView: View {
             onSelect(task)
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
         } label: {
-            HStack(spacing: 12) {
+            HStack(spacing: 14) {
                 // Selection indicator
-                Image(systemName: selectedTask?.id == task.id ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 22))
-                    .foregroundStyle(selectedTask?.id == task.id ? themeManager.accentColor : .secondary.opacity(0.4))
-                    .contentTransition(.symbolEffect(.replace))
+                ZStack {
+                    Circle()
+                        .stroke(selectedTask?.id == task.id ? themeManager.accentColor : Color.secondary.opacity(0.3), lineWidth: 2)
+                        .frame(width: 24, height: 24)
+
+                    if selectedTask?.id == task.id {
+                        Circle()
+                            .fill(themeManager.accentColor)
+                            .frame(width: 14, height: 14)
+                    }
+                }
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(task.title)
@@ -219,8 +243,8 @@ struct FocusTaskPickerView: View {
                                 .foregroundStyle(.secondary)
 
                             if task.isTimeBasedUnit {
-                                Image(systemName: "clock")
-                                    .font(.system(size: 10))
+                                Image(systemName: "clock.fill")
+                                    .font(.system(size: 9))
                                     .foregroundStyle(themeManager.accentColor)
                             }
                         }
@@ -229,19 +253,19 @@ struct FocusTaskPickerView: View {
 
                 Spacer()
 
-                // Time indicator for time-based tasks
+                // Duration badge for time-based tasks
                 if let duration = task.durationInMinutes {
                     Text(formatDuration(duration))
                         .font(.caption.weight(.medium))
                         .foregroundStyle(themeManager.accentColor)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
                         .background(themeManager.accentColor.opacity(0.12))
                         .clipShape(Capsule())
                 }
             }
             .padding(.horizontal, 14)
-            .padding(.vertical, 12)
+            .padding(.vertical, 14)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -264,28 +288,28 @@ struct FocusTaskPickerView: View {
     private var emptyStateView: some View {
         VStack(spacing: 16) {
             Image(systemName: "tray")
-                .font(.system(size: 48))
+                .font(.system(size: 44))
                 .foregroundStyle(.secondary.opacity(0.5))
 
-            VStack(spacing: 4) {
+            VStack(spacing: 6) {
                 Text("No Tasks Available")
                     .font(.headline)
                     .foregroundStyle(.primary)
 
-                Text("Add assignments, goals, or habits to get started")
+                Text("Add assignments, goals, or habits\nto track your focus time")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 40)
+        .padding(.vertical, 48)
     }
 
     private var noResultsView: some View {
         VStack(spacing: 12) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 32))
+                .font(.system(size: 28))
                 .foregroundStyle(.secondary.opacity(0.5))
 
             Text("No results for \"\(searchText)\"")
@@ -293,7 +317,7 @@ struct FocusTaskPickerView: View {
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 32)
+        .padding(.vertical, 40)
     }
 }
 
@@ -304,7 +328,7 @@ struct FocusTaskPickerView: View {
 
         var body: some View {
             ZStack {
-                Color.gray.opacity(0.2)
+                Color(.systemGroupedBackground)
                     .ignoresSafeArea()
 
                 if isPresented {
