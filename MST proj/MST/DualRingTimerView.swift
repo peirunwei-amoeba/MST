@@ -19,9 +19,9 @@ struct DualRingTimerView: View {
     let displayTime: String
     let timeLabel: String
 
-    // Ring dimensions - fused appearance
-    private let outerRingWidth: CGFloat = 22
-    private let innerRingWidth: CGFloat = 14
+    // Ring dimensions - balanced for easier dragging
+    private let outerRingWidth: CGFloat = 24  // Minutes - slightly thinner
+    private let innerRingWidth: CGFloat = 28  // Hours - thicker for easier grip
     private let ringGap: CGFloat = 0  // No gap for truly fused look
 
     // Drag state
@@ -221,10 +221,10 @@ struct DualRingTimerView: View {
         var angle = atan2(dx, -dy) * 180 / .pi
         if angle < 0 { angle += 360 }
 
-        // Define zones
-        let outerZone = outerRadius - outerRingWidth...outerRadius + outerRingWidth + 15
-        let innerZone = innerRadius - innerRingWidth - 10...innerRadius + innerRingWidth + 10
-        let centerZone = 0.0...(innerRadius - innerRingWidth - 10)
+        // Define zones - generous hit areas for easier dragging
+        let outerZone = outerRadius - outerRingWidth - 8...outerRadius + outerRingWidth + 20
+        let innerZone = innerRadius - innerRingWidth - 20...innerRadius + innerRingWidth + 20
+        let centerZone = 0.0...(innerRadius - innerRingWidth - 20)
 
         // Determine initial lock if not already locked
         if dragLock == .none {

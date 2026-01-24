@@ -194,20 +194,6 @@ struct FocusView: View {
             }
             .padding(.horizontal, 20)
 
-            // Task picker overlay
-            if showTaskPicker {
-                FocusTaskPickerView(
-                    isPresented: $showTaskPicker,
-                    selectedTask: $selectedTask,
-                    assignments: incompleteAssignments,
-                    goals: incompleteGoals,
-                    habits: activeHabits.filter { !$0.isCompletedToday },
-                    onSelect: { task in
-                        selectTask(task)
-                    }
-                )
-                .transition(.opacity.combined(with: .move(edge: .bottom)))
-            }
 
             // Completion overlay
             if showCompletionOverlay {
@@ -228,7 +214,17 @@ struct FocusView: View {
         }
         .navigationTitle("Focus")
         .navigationBarTitleDisplayMode(.large)
-        .animation(.easeInOut(duration: 0.3), value: showTaskPicker)
+        .sheet(isPresented: $showTaskPicker) {
+            FocusTaskPickerView(
+                selectedTask: $selectedTask,
+                assignments: incompleteAssignments,
+                goals: incompleteGoals,
+                habits: activeHabits.filter { !$0.isCompletedToday },
+                onSelect: { task in
+                    selectTask(task)
+                }
+            )
+        }
         .animation(.easeInOut(duration: 0.4), value: showCompletionOverlay)
     }
 
@@ -451,10 +447,7 @@ struct FocusView: View {
             UISelectionFeedbackGenerator().selectionChanged()
         }
         // Non-time units: don't change timer, let user adjust manually
-
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-            showTaskPicker = false
-        }
+        // Sheet dismisses itself via dismiss() in FocusTaskPickerView
     }
 
     private func markTaskComplete() {
