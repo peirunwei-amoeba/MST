@@ -35,20 +35,36 @@ struct HomeView: View {
     @State private var recentlyCompletedHabitIds: Set<UUID> = []
     @State private var showingMilestoneCompletion: Habit?
 
+    // Scroll position state for preserving position during project completion
+    @State private var scrollToProjectsOnComplete = false
+
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 20) {
-                    // Habits section (at the top)
-                    habitsSection
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(spacing: 20) {
+                        // Habits section (at the top)
+                        habitsSection
 
-                    // Upcoming assignments section
-                    assignmentSection
+                        // Upcoming assignments section
+                        assignmentSection
 
-                    // Projects section
-                    projectSection
+                        // Projects section
+                        projectSection
+                            .id("projectsSection")
+                    }
+                    .padding()
                 }
-                .padding()
+                .onChange(of: recentlyCompletedProjectIds) { oldValue, newValue in
+                    // When a project completes, scroll to projects section to maintain position
+                    if newValue.count > oldValue.count {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                proxy.scrollTo("projectsSection", anchor: .top)
+                            }
+                        }
+                    }
+                }
             }
             .background(themeManager.backgroundColor)
             .navigationTitle("Welcome")
@@ -176,6 +192,7 @@ struct HomeView: View {
                         .padding(12)
                         .glassEffect(.regular)
                         .clipShape(Circle())
+                        .contentShape(Circle())
                 }
             }
             .padding(.horizontal, 4)
@@ -206,7 +223,6 @@ struct HomeView: View {
                         .padding(.horizontal, 4)
                         .padding(.vertical, 4)
                     }
-                    .scrollClipDisabled()
                 }
             }
             .animation(.easeInOut(duration: 0.4), value: activeHabits.isEmpty)
@@ -336,6 +352,7 @@ struct HomeView: View {
                         .padding(12)
                         .glassEffect(.regular)
                         .clipShape(Circle())
+                        .contentShape(Circle())
                 }
             }
             .padding(.horizontal, 4)
@@ -526,6 +543,7 @@ struct HomeView: View {
                         .padding(12)
                         .glassEffect(.regular)
                         .clipShape(Circle())
+                        .contentShape(Circle())
                 }
             }
             .padding(.horizontal, 4)
@@ -734,17 +752,22 @@ struct ConcentricProjectRow: View {
             HStack(spacing: 12) {
                 // Main checkmark button for next goal
                 Button {
+                    // Call toggle first to trigger color change
+                    onToggleNextGoal()
+
+                    // Then delay the twist animation slightly
                     if let goal = nextGoal {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
-                            animatingGoalId = goal.id
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
+                                animatingGoalId = goal.id
+                            }
                         }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
                             withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
                                 animatingGoalId = nil
                             }
                         }
                     }
-                    onToggleNextGoal()
                 } label: {
                     Image(systemName: nextGoal != nil ? "circle" : "checkmark.circle.fill")
                         .font(.system(size: mainCheckmarkSize))
@@ -834,12 +857,21 @@ struct ConcentricProjectRow: View {
                     let isGoalAnimating = animatingGoalId == goal.id
                     VStack(spacing: 4) {
                         // Checkmark dot - colored by priority when incomplete
-                        Image(systemName: goal.isCompleted ? "checkmark.circle.fill" : "circle")
-                            .font(.system(size: dotSize))
-                            .foregroundStyle(goal.isCompleted ? .green : goalPriorityColor(goal))
-                            .contentTransition(.symbolEffect(.replace.magic(fallback: .replace)))
-                            .scaleEffect(isGoalAnimating ? 1.35 : 1.0)
-                            .rotationEffect(.degrees(isGoalAnimating ? 10 : 0))
+                        ZStack {
+                            Image(systemName: goal.isCompleted ? "checkmark.circle.fill" : "circle")
+                                .font(.system(size: dotSize))
+                                .foregroundStyle(goal.isCompleted ? .green : goalPriorityColor(goal))
+                                .contentTransition(.symbolEffect(.replace.magic(fallback: .replace)))
+                                .scaleEffect(isGoalAnimating ? 1.35 : 1.0)
+                                .rotationEffect(.degrees(isGoalAnimating ? 10 : 0))
+
+                            // Priority indicator for high/urgent incomplete goals
+                            if !goal.isCompleted && (goal.priority == .high || goal.priority == .urgent) {
+                                Image(systemName: goal.priority == .urgent ? "exclamationmark.2" : "exclamationmark")
+                                    .font(.system(size: 7, weight: .bold))
+                                    .foregroundStyle(.white)
+                            }
+                        }
 
                         // Title caption centered under dot - allow 2 lines
                         VStack(spacing: 2) {
@@ -875,10 +907,10 @@ struct ConcentricProjectRow: View {
     private func goalPriorityColor(_ goal: Goal) -> Color {
         switch goal.priority {
         case .none: return .gray.opacity(0.5)
-        case .low: return .green.opacity(0.6)
-        case .medium: return .blue.opacity(0.6)
-        case .high: return .orange.opacity(0.7)
-        case .urgent: return .red.opacity(0.8)
+        case .low: return .green
+        case .medium: return .blue
+        case .high: return .orange
+        case .urgent: return .red
         }
     }
 }
@@ -909,17 +941,23 @@ struct ConcentricAssignmentRow: View {
                         // Play system confirmation sound
                         AudioServicesPlaySystemSound(1407)
 
-                        // Animate checkmark
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
-                            animatingCheckmark = true
+                        // Call toggle first to trigger color change
+                        onToggleComplete()
+
+                        // Then delay the twist animation slightly to start after color change begins
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
+                                animatingCheckmark = true
+                            }
                         }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
                             withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
                                 animatingCheckmark = false
                             }
                         }
+                    } else {
+                        onToggleComplete()
                     }
-                    onToggleComplete()
                 } label: {
                     Image(systemName: assignment.isCompleted ? "checkmark.circle.fill" : "circle")
                         .font(.system(size: 28))
@@ -937,19 +975,14 @@ struct ConcentricAssignmentRow: View {
                         .lineLimit(1)
 
                     HStack(spacing: 8) {
-                        // Priority indicator pill
+                        // Priority indicator - symbol only
                         if assignment.priority == .urgent || assignment.priority == .high {
-                            HStack(spacing: 3) {
-                                Image(systemName: assignment.priority == .urgent ? "exclamationmark.2" : "exclamationmark")
-                                    .font(.system(size: 9, weight: .bold))
-                                Text(assignment.priority.rawValue)
-                                    .font(.caption2.weight(.semibold))
-                            }
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 3)
-                            .background(priorityColor.opacity(0.15))
-                            .foregroundStyle(priorityColor)
-                            .clipShape(Capsule())
+                            Image(systemName: assignment.priority == .urgent ? "exclamationmark.2" : "exclamationmark")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(priorityColor)
+                                .padding(5)
+                                .background(priorityColor.opacity(0.15))
+                                .clipShape(Circle())
                         }
 
                         // Subject pill

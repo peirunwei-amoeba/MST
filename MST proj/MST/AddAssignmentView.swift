@@ -16,7 +16,7 @@ struct AddAssignmentView: View {
     @State private var assignmentDescription = ""
     @State private var dueDate = Date()
     @State private var dueTime = Date()
-    @State private var priority: Priority = .medium
+    @State private var priority: Priority = .none
     @State private var subject = ""
     @State private var notes = ""
     @State private var notificationEnabled = true

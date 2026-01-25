@@ -18,6 +18,7 @@ struct EditProjectView: View {
     @State private var newGoalPriority: Priority = .none
     @State private var newGoalHasTarget = false
     @State private var newGoalTargetValue: Double = 1.0
+    @State private var newGoalTargetValueString = "1"
     @State private var newGoalTargetUnit: TargetUnit = .hour
 
     var body: some View {
@@ -90,17 +91,25 @@ struct EditProjectView: View {
 
                         // Target value/unit row
                         HStack {
-                            Toggle("Target", isOn: $newGoalHasTarget)
+                            Toggle("Target", isOn: $newGoalHasTarget.animation(.easeInOut(duration: 0.2)))
                                 .labelsHidden()
                             Text("Target:")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
 
                             if newGoalHasTarget {
-                                TextField("", value: $newGoalTargetValue, format: .number)
+                                TextField("", text: $newGoalTargetValueString)
                                     .keyboardType(.decimalPad)
                                     .frame(width: 50)
-                                    .textFieldStyle(.roundedBorder)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 6)
+                                    .background(.ultraThinMaterial)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                    .onChange(of: newGoalTargetValueString) { _, newValue in
+                                        if let doubleValue = Double(newValue) {
+                                            newGoalTargetValue = doubleValue
+                                        }
+                                    }
 
                                 Picker("", selection: $newGoalTargetUnit) {
                                     ForEach(TargetUnit.allCases) { unit in
@@ -174,6 +183,7 @@ struct EditProjectView: View {
         newGoalPriority = .none
         newGoalHasTarget = false
         newGoalTargetValue = 1.0
+        newGoalTargetValueString = "1"
         newGoalTargetUnit = .hour
         newGoalDate = Calendar.current.date(byAdding: .weekOfYear, value: 1, to: newGoalDate) ?? newGoalDate
     }
@@ -195,6 +205,7 @@ struct EditProjectView: View {
 
 struct GoalEditRow: View {
     @Bindable var goal: Goal
+    @State private var targetValueString: String = ""
 
     private var checkmarkColor: Color {
         if goal.isCompleted {
@@ -221,13 +232,6 @@ struct GoalEditRow: View {
                     goal.targetUnit = .none
                 }
             }
-        )
-    }
-
-    private var targetValueBinding: Binding<Double> {
-        Binding(
-            get: { goal.targetValue ?? 1.0 },
-            set: { goal.targetValue = $0 }
         )
     }
 
@@ -282,17 +286,25 @@ struct GoalEditRow: View {
 
             // Target value/unit row
             HStack {
-                Toggle("Target", isOn: hasTargetBinding)
+                Toggle("Target", isOn: hasTargetBinding.animation(.easeInOut(duration: 0.2)))
                     .labelsHidden()
                 Text("Target:")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
                 if goal.targetValue != nil {
-                    TextField("", value: targetValueBinding, format: .number)
+                    TextField("", text: $targetValueString)
                         .keyboardType(.decimalPad)
                         .frame(width: 50)
-                        .textFieldStyle(.roundedBorder)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 6)
+                        .background(.ultraThinMaterial)
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .onChange(of: targetValueString) { _, newValue in
+                            if let doubleValue = Double(newValue) {
+                                goal.targetValue = doubleValue
+                            }
+                        }
 
                     Picker("", selection: $goal.targetUnit) {
                         ForEach(TargetUnit.allCases) { unit in
@@ -307,6 +319,11 @@ struct GoalEditRow: View {
             }
         }
         .padding(.vertical, 4)
+        .onAppear {
+            if let value = goal.targetValue {
+                targetValueString = String(format: "%.0f", value)
+            }
+        }
     }
 
     private func priorityColor(for priority: Priority) -> Color {

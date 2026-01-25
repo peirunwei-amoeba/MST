@@ -46,7 +46,7 @@ final class Assignment {
         createdDate: Date = Date(),
         isCompleted: Bool = false,
         completedDate: Date? = nil,
-        priority: Priority = .medium,
+        priority: Priority = .none,
         subject: String = "",
         tags: [String] = [],
         notes: String = "",

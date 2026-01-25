@@ -221,16 +221,18 @@ struct DualRingTimerView: View {
         var angle = atan2(dx, -dy) * 180 / .pi
         if angle < 0 { angle += 360 }
 
-        // Define zones - generous hit areas for easier dragging
-        let outerZone = outerRadius - outerRingWidth - 8...outerRadius + outerRingWidth + 20
-        let innerZone = innerRadius - innerRingWidth - 20...innerRadius + innerRingWidth + 20
-        let centerZone = 0.0...(innerRadius - innerRingWidth - 20)
+        // Calculate clear boundary between rings to prevent overlap
+        let boundaryRadius = (outerRadius - outerRingWidth + innerRadius + innerRingWidth) / 2
+
+        // Define zones with clear separation - outer ring gets priority in boundary area
+        let outerZone = boundaryRadius...outerRadius + outerRingWidth + 20
+        let innerZone = 0.0..<boundaryRadius
 
         // Determine initial lock if not already locked
         if dragLock == .none {
             if outerZone.contains(distance) {
                 dragLock = .outer
-            } else if innerZone.contains(distance) || centerZone.contains(distance) {
+            } else if innerZone.contains(distance) {
                 dragLock = .inner
             }
         }

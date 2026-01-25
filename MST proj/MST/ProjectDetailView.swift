@@ -140,7 +140,6 @@ struct ProjectDetailView: View {
                     .padding(.vertical, 20)
                     .padding(.horizontal, 24)
                 }
-                .scrollClipDisabled()
                 .background {
                     RoundedRectangle(cornerRadius: 20, style: .continuous)
                         .fill(.ultraThinMaterial)
@@ -292,17 +291,22 @@ struct GoalColumnView: View {
         VStack(spacing: 8) {
             // Big checkmark button - colored by priority when incomplete
             Button {
+                // Call toggle first to trigger color change
+                onToggleComplete()
+
+                // Then delay the twist animation slightly
                 if !goal.isCompleted && isEnabled {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
-                        animatingCheckmark = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
+                            animatingCheckmark = true
+                        }
                     }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
                         withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
                             animatingCheckmark = false
                         }
                     }
                 }
-                onToggleComplete()
             } label: {
                 Image(systemName: goal.isCompleted ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: dotSize))

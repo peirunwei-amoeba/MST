@@ -216,8 +216,12 @@ struct FocusTaskPickerView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
-            .glassEffect(.regular)
+            .background(.ultraThinMaterial)
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(.white.opacity(0.15), lineWidth: 0.5)
+            )
         }
         .buttonStyle(.plain)
     }

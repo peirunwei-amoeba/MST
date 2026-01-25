@@ -22,7 +22,12 @@ struct AddProjectView: View {
         let id = UUID()
         var title: String
         var targetDate: Date
+        var targetTime: Date = Date()
         var priority: Priority = .none
+        var hasTarget: Bool = false
+        var targetValue: Double = 1.0
+        var targetValueString: String = "1"
+        var targetUnit: TargetUnit = .hour
     }
 
     var body: some View {
@@ -45,8 +50,11 @@ struct AddProjectView: View {
                     ForEach($goalEntries) { $entry in
                         VStack(alignment: .leading, spacing: 8) {
                             TextField("Goal title", text: $entry.title)
+
                             HStack {
-                                DatePicker("Target", selection: $entry.targetDate, displayedComponents: .date)
+                                DatePicker("Date", selection: $entry.targetDate, displayedComponents: .date)
+                                    .labelsHidden()
+                                DatePicker("Time", selection: $entry.targetTime, displayedComponents: .hourAndMinute)
                                     .labelsHidden()
 
                                 Spacer()
@@ -63,6 +71,40 @@ struct AddProjectView: View {
                                     }
                                 }
                                 .pickerStyle(.menu)
+                            }
+
+                            // Target row
+                            HStack {
+                                Toggle("", isOn: $entry.hasTarget.animation(.easeInOut(duration: 0.2)))
+                                    .labelsHidden()
+                                Text("Target:")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+
+                                if entry.hasTarget {
+                                    TextField("", text: $entry.targetValueString)
+                                        .keyboardType(.decimalPad)
+                                        .frame(width: 50)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 6)
+                                        .background(.ultraThinMaterial)
+                                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                        .onChange(of: entry.targetValueString) { _, newValue in
+                                            if let doubleValue = Double(newValue) {
+                                                entry.targetValue = doubleValue
+                                            }
+                                        }
+
+                                    Picker("", selection: $entry.targetUnit) {
+                                        ForEach(TargetUnit.allCases) { unit in
+                                            Text(unit.rawValue).tag(unit)
+                                        }
+                                    }
+                                    .pickerStyle(.menu)
+                                } else {
+                                    Text("None")
+                                        .foregroundStyle(.secondary)
+                                }
                             }
                         }
                         .padding(.vertical, 4)
@@ -141,12 +183,17 @@ struct AddProjectView: View {
         // Create goals from entries
         for (index, entry) in goalEntries.enumerated() {
             if !entry.title.trimmingCharacters(in: .whitespaces).isEmpty {
+                // Combine date and time
+                let combinedDate = combineDateAndTime(date: entry.targetDate, time: entry.targetTime)
+
                 let goal = Goal(
                     title: entry.title.trimmingCharacters(in: .whitespaces),
-                    targetDate: entry.targetDate,
+                    targetDate: combinedDate,
                     sortOrder: index,
                     priority: entry.priority,
-                    project: project
+                    project: project,
+                    targetValue: entry.hasTarget ? entry.targetValue : nil,
+                    targetUnit: entry.hasTarget ? entry.targetUnit : .none
                 )
                 project.goals.append(goal)
             }
@@ -154,6 +201,21 @@ struct AddProjectView: View {
 
         modelContext.insert(project)
         dismiss()
+    }
+
+    private func combineDateAndTime(date: Date, time: Date) -> Date {
+        let calendar = Calendar.current
+        let dateComponents = calendar.dateComponents([.year, .month, .day], from: date)
+        let timeComponents = calendar.dateComponents([.hour, .minute], from: time)
+
+        var combined = DateComponents()
+        combined.year = dateComponents.year
+        combined.month = dateComponents.month
+        combined.day = dateComponents.day
+        combined.hour = timeComponents.hour
+        combined.minute = timeComponents.minute
+
+        return calendar.date(from: combined) ?? date
     }
 }
 

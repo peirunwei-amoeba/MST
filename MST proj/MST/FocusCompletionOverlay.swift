@@ -83,7 +83,7 @@ struct FocusCompletionOverlay: View {
                         .font(.system(size: checkmarkSize, weight: .medium))
                         .foregroundStyle(completionBounce ? .green : (isHolding && holdProgress > 0) ? .green.opacity(0.4 + holdProgress * 0.6) : .white.opacity(0.4))
                         .contentTransition(.symbolEffect(.replace.magic(fallback: .replace)))
-                        .scaleEffect(completionBounce ? 1.3 : (isHolding ? 1.0 + holdProgress * 0.15 : 1.0))
+                        .scaleEffect(completionBounce ? 1.35 : (isHolding ? 1.0 + holdProgress * 0.15 : 1.0))
                         .rotationEffect(.degrees(completionBounce ? 10 : (isHolding ? holdProgress * 8 : 0)))
                 }
                 .contentShape(Circle())
