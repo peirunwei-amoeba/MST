@@ -24,8 +24,8 @@ struct EditProjectView: View {
     @State private var newGoalDate = Date()
     @State private var newGoalPriority: Priority = .none
     @State private var newGoalHasTarget = false
-    @State private var newGoalTargetValue: Double = 1.0
-    @State private var newGoalTargetValueString = "1"
+    @State private var newGoalTargetValue: Double = 0
+    @State private var newGoalTargetValueString = ""
     @State private var newGoalTargetUnit: TargetUnit = .hour
 
     var body: some View {
@@ -105,9 +105,9 @@ struct EditProjectView: View {
                                 .foregroundStyle(.secondary)
 
                             if newGoalHasTarget {
-                                TextField("", text: $newGoalTargetValueString)
+                                TextField("Value", text: $newGoalTargetValueString)
                                     .keyboardType(.decimalPad)
-                                    .frame(width: 50)
+                                    .frame(width: 60)
                                     .padding(.horizontal, 8)
                                     .padding(.vertical, 6)
                                     .background(.ultraThinMaterial)
@@ -163,6 +163,7 @@ struct EditProjectView: View {
                 }
             }
         }
+        .interactiveDismissDisabled(true)
     }
 
     private func priorityColor(for priority: Priority) -> Color {
@@ -189,8 +190,8 @@ struct EditProjectView: View {
         newGoalTitle = ""
         newGoalPriority = .none
         newGoalHasTarget = false
-        newGoalTargetValue = 1.0
-        newGoalTargetValueString = "1"
+        newGoalTargetValue = 0
+        newGoalTargetValueString = ""
         newGoalTargetUnit = .hour
         newGoalDate = Calendar.current.date(byAdding: .weekOfYear, value: 1, to: newGoalDate) ?? newGoalDate
     }
@@ -232,11 +233,13 @@ struct GoalEditRow: View {
             get: { goal.targetValue != nil },
             set: { newValue in
                 if newValue {
-                    goal.targetValue = 1.0
+                    goal.targetValue = 1.0  // Minimum valid value
                     goal.targetUnit = .hour
+                    targetValueString = ""  // Empty so user can enter their value
                 } else {
                     goal.targetValue = nil
                     goal.targetUnit = .none
+                    targetValueString = ""
                 }
             }
         )
@@ -300,9 +303,9 @@ struct GoalEditRow: View {
                     .foregroundStyle(.secondary)
 
                 if goal.targetValue != nil {
-                    TextField("", text: $targetValueString)
+                    TextField("Value", text: $targetValueString)
                         .keyboardType(.decimalPad)
-                        .frame(width: 50)
+                        .frame(width: 60)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 6)
                         .background(.ultraThinMaterial)

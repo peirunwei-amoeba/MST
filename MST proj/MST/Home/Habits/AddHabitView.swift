@@ -22,7 +22,8 @@ struct AddHabitView: View {
 
     @State private var title = ""
     @State private var habitDescription = ""
-    @State private var targetValue: Double = 1.0
+    @State private var targetValue: Double = 1.0  // Habits require a valid target
+    @State private var targetValueString: String = ""
     @State private var selectedUnit: TargetUnit = .times
     @State private var frequency: HabitFrequency = .daily
     @State private var maxCompletionDays: Int = 60
@@ -41,10 +42,15 @@ struct AddHabitView: View {
                     HStack {
                         Text("Target")
                         Spacer()
-                        TextField("Value", value: $targetValue, format: .number)
+                        TextField("Value", text: $targetValueString)
                             .keyboardType(.decimalPad)
                             .multilineTextAlignment(.trailing)
                             .frame(width: 80)
+                            .onChange(of: targetValueString) { _, newValue in
+                                if let doubleValue = Double(newValue), doubleValue > 0 {
+                                    targetValue = doubleValue
+                                }
+                            }
 
                         Picker("", selection: $selectedUnit) {
                             ForEach(TargetUnit.allCases) { unit in

@@ -188,6 +188,14 @@ struct FocusTaskPickerView: View {
                         .foregroundStyle(.primary)
                         .lineLimit(1)
 
+                    // Show project name for goals
+                    if case .goal(let goal) = task, let project = goal.project {
+                        Text(project.title)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+
                     // Target info
                     if let value = task.targetValue, task.targetUnit != .none {
                         HStack(spacing: 6) {
@@ -217,7 +225,7 @@ struct FocusTaskPickerView: View {
                         .foregroundStyle(themeManager.accentColor)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
-                        .glassEffect(.regular)
+                        .glassEffect(.regular.interactive())
                         .clipShape(Capsule())
                 }
             }

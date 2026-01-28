@@ -139,7 +139,7 @@ struct ConcentricHabitCard: View {
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .strokeBorder(.white.opacity(0.2), lineWidth: 0.5)
             )
-            .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 4)
+            .shadow(color: .black.opacity(0.04), radius: 4, x: 0, y: 2)
             .scaleEffect(isHolding && holdProgress > 0 ? 0.96 : 1.0)
         }
         .buttonStyle(.plain)
@@ -196,9 +196,14 @@ struct ConcentricHabitCard: View {
             AudioServicesPlaySystemSound(1407)
         }
 
-        // Bounce animation (same as other checkmarks)
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
-            completionBounce = true
+        // FIRST: Trigger the actual completion (makes checkmark green)
+        onToggleComplete()
+
+        // THEN: Bounce animation with slight delay to ensure color change is visible
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
+                completionBounce = true
+            }
         }
 
         // Ripple effect
@@ -206,16 +211,13 @@ struct ConcentricHabitCard: View {
             showRipple = true
         }
 
-        // Reset after animation (same timing as other checkmarks)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+        // Reset after animation
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
             withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
                 completionBounce = false
                 holdProgress = 0
             }
             showRipple = false
-
-            // Trigger the actual completion
-            onToggleComplete()
         }
     }
 

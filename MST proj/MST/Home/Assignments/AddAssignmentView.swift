@@ -28,7 +28,8 @@ struct AddAssignmentView: View {
     @State private var notes = ""
     @State private var notificationEnabled = true
     @State private var hasTarget = false
-    @State private var targetValue: Double = 1.0
+    @State private var targetValue: Double = 0
+    @State private var targetValueString: String = ""
     @State private var targetUnit: TargetUnit = .times
 
     // For navigating to edit after creation
@@ -66,10 +67,15 @@ struct AddAssignmentView: View {
                         HStack {
                             Text("Amount")
                             Spacer()
-                            TextField("Value", value: $targetValue, format: .number)
+                            TextField("Value", text: $targetValueString)
                                 .keyboardType(.decimalPad)
                                 .multilineTextAlignment(.trailing)
                                 .frame(width: 80)
+                                .onChange(of: targetValueString) { _, newValue in
+                                    if let doubleValue = Double(newValue), doubleValue > 0 {
+                                        targetValue = doubleValue
+                                    }
+                                }
 
                             Picker("", selection: $targetUnit) {
                                 ForEach(TargetUnit.allCases) { unit in

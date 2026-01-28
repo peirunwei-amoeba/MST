@@ -48,6 +48,14 @@ struct SettingsView: View {
                     }
                 }
 
+                // Focus Timer Section
+                Section("Focus Timer") {
+                    Toggle("Keep Screen On During Focus", isOn: Binding(
+                        get: { themeManager.keepScreenOnDuringFocus },
+                        set: { themeManager.keepScreenOnDuringFocus = $0 }
+                    ))
+                }
+
                 // About Section
                 Section("About") {
                     Button {

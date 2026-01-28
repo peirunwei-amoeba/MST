@@ -21,11 +21,18 @@ struct EditAssignmentView: View {
 
     @State private var dueDate: Date
     @State private var dueTime: Date
+    @State private var targetValueString: String
 
     init(assignment: Assignment) {
         self.assignment = assignment
         _dueDate = State(initialValue: assignment.dueDate)
         _dueTime = State(initialValue: assignment.dueDate)
+        // Initialize target value string: empty if nil, formatted number if has value
+        if let value = assignment.targetValue {
+            _targetValueString = State(initialValue: String(format: value.truncatingRemainder(dividingBy: 1) == 0 ? "%.0f" : "%.2f", value))
+        } else {
+            _targetValueString = State(initialValue: "")
+        }
     }
 
     var body: some View {
@@ -83,10 +90,15 @@ struct EditAssignmentView: View {
                         HStack {
                             Text("Amount")
                             Spacer()
-                            TextField("Value", value: targetValueBinding, format: .number)
+                            TextField("Value", text: $targetValueString)
                                 .keyboardType(.decimalPad)
                                 .multilineTextAlignment(.trailing)
                                 .frame(width: 80)
+                                .onChange(of: targetValueString) { _, newValue in
+                                    if let doubleValue = Double(newValue), doubleValue > 0 {
+                                        assignment.targetValue = doubleValue
+                                    }
+                                }
 
                             Picker("", selection: $assignment.targetUnit) {
                                 ForEach(TargetUnit.allCases) { unit in
@@ -138,20 +150,16 @@ struct EditAssignmentView: View {
             get: { assignment.targetValue != nil },
             set: { newValue in
                 if newValue {
-                    assignment.targetValue = 1.0
+                    // Enable target with empty value - user will enter their own
+                    assignment.targetValue = 1.0  // Minimum valid value
                     assignment.targetUnit = .times
+                    targetValueString = ""  // Empty so user can enter their value
                 } else {
                     assignment.targetValue = nil
                     assignment.targetUnit = .none
+                    targetValueString = ""
                 }
             }
-        )
-    }
-
-    private var targetValueBinding: Binding<Double> {
-        Binding(
-            get: { assignment.targetValue ?? 1.0 },
-            set: { assignment.targetValue = $0 }
         )
     }
 

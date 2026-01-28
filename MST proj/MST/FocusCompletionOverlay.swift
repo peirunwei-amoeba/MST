@@ -24,6 +24,7 @@ struct FocusCompletionOverlay: View {
     @State private var isHolding = false
     @State private var holdProgress: CGFloat = 0
     @State private var completionBounce = false
+    @State private var animatingBounce = false  // Separate state for twist/smack animation
     @State private var showRipple = false
     @State private var hapticTimer: Timer?
     @State private var holdStartTime: Date?
@@ -90,8 +91,8 @@ struct FocusCompletionOverlay: View {
                         .font(.system(size: checkmarkSize, weight: .medium))
                         .foregroundStyle(completionBounce ? .green : (isHolding && holdProgress > 0) ? .green.opacity(0.4 + holdProgress * 0.6) : .white.opacity(0.4))
                         .contentTransition(.symbolEffect(.replace.magic(fallback: .replace)))
-                        .scaleEffect(completionBounce ? 1.35 : (isHolding ? 1.0 + holdProgress * 0.15 : 1.0))
-                        .rotationEffect(.degrees(completionBounce ? 10 : (isHolding ? holdProgress * 8 : 0)))
+                        .scaleEffect(animatingBounce ? 1.35 : (isHolding ? 1.0 + holdProgress * 0.15 : 1.0))
+                        .rotationEffect(.degrees(animatingBounce ? 10 : (isHolding ? holdProgress * 8 : 0)))
                 }
                 .contentShape(Circle())
                 .onLongPressGesture(minimumDuration: holdDuration, maximumDistance: 80) {
@@ -182,9 +183,16 @@ struct FocusCompletionOverlay: View {
             AudioServicesPlaySystemSound(1407)
         }
 
-        // Bounce animation
+        // FIRST: Show filled checkmark (turns green)
         withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
             completionBounce = true
+        }
+
+        // THEN: Trigger twist/smack animation with slight delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
+                animatingBounce = true
+            }
         }
 
         // Ripple effect
@@ -192,11 +200,16 @@ struct FocusCompletionOverlay: View {
             showRipple = true
         }
 
-        // Complete after animation
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+        // Reset animation after bounce completes
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
             withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
+                animatingBounce = false
                 holdProgress = 0
             }
+        }
+
+        // Complete after animation
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
             showRipple = false
 
             // Trigger completion

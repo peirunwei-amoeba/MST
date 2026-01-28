@@ -20,6 +20,8 @@ struct EditHabitView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var themeManager: ThemeManager
 
+    @State private var targetValueString: String = ""
+
     var body: some View {
         NavigationStack {
             Form {
@@ -34,10 +36,22 @@ struct EditHabitView: View {
                     HStack {
                         Text("Target")
                         Spacer()
-                        TextField("Value", value: $habit.targetValue, format: .number)
+                        TextField("Value", text: $targetValueString)
                             .keyboardType(.decimalPad)
                             .multilineTextAlignment(.trailing)
                             .frame(width: 80)
+                            .onChange(of: targetValueString) { _, newValue in
+                                if let doubleValue = Double(newValue), doubleValue > 0 {
+                                    habit.targetValue = doubleValue
+                                }
+                            }
+                            .onAppear {
+                                // Initialize from habit's current value
+                                let value = habit.targetValue
+                                targetValueString = value.truncatingRemainder(dividingBy: 1) == 0
+                                    ? String(format: "%.0f", value)
+                                    : String(format: "%.2f", value)
+                            }
 
                         Picker("", selection: $habit.unit) {
                             ForEach(TargetUnit.allCases) { unit in

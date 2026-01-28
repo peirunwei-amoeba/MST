@@ -18,6 +18,7 @@ struct HabitHeatmapView: View {
     let habit: Habit
 
     @EnvironmentObject private var themeManager: ThemeManager
+    @State private var hasAppeared = false
 
     private let monthLetters = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"]
     private let cellSize: CGFloat = 18
@@ -55,6 +56,12 @@ struct HabitHeatmapView: View {
         .padding(20)
         .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .onAppear {
+            // Trigger the staggered animation when view appears
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                hasAppeared = true
+            }
+        }
     }
 
     private var currentYear: Int {
@@ -64,6 +71,8 @@ struct HabitHeatmapView: View {
     @ViewBuilder
     private func dayCell(day: Int, month: Int) -> some View {
         let status = dayStatus(day: day, month: month)
+        // Stagger animation based on position
+        let delay = Double(day + month * 31) * 0.003
 
         Group {
             switch status {
@@ -71,22 +80,30 @@ struct HabitHeatmapView: View {
                 Image(systemName: "arrowtriangle.up.fill")
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(themeManager.accentColor)
+                    .scaleEffect(hasAppeared ? 1.0 : 0.3)
+                    .opacity(hasAppeared ? 1.0 : 0)
+                    .animation(.spring(response: 0.4, dampingFraction: 0.6).delay(delay), value: hasAppeared)
             case .missed:
                 Circle()
                     .fill(Color.secondary.opacity(0.3))
                     .frame(width: 6, height: 6)
+                    .opacity(hasAppeared ? 1.0 : 0)
+                    .animation(.easeOut(duration: 0.3).delay(delay), value: hasAppeared)
             case .future:
                 Circle()
                     .fill(Color.secondary.opacity(0.15))
                     .frame(width: 6, height: 6)
+                    .opacity(hasAppeared ? 1.0 : 0)
+                    .animation(.easeOut(duration: 0.3).delay(delay), value: hasAppeared)
             case .invalid:
                 Color.clear
             }
         }
         .frame(width: cellSize, height: cellSize)
+        .animation(.easeInOut(duration: 0.3), value: status)
     }
 
-    private enum DayStatus {
+    private enum DayStatus: Equatable {
         case completed
         case missed
         case future

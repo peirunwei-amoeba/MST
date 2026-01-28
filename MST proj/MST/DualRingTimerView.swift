@@ -187,7 +187,7 @@ struct DualRingTimerView: View {
 
                 VStack(spacing: 2) {
                     Text(displayTime)
-                        .font(.system(size: selectedHours > 0 || isRunning ? 52 : 72, weight: .ultraLight, design: .rounded))
+                        .font(.system(size: selectedHours > 0 || isRunning || isPaused ? 52 : 72, weight: .ultraLight, design: .rounded))
                         .monospacedDigit()
                         .foregroundStyle(.primary)
                         .contentTransition(.numericText())

@@ -32,8 +32,8 @@ struct AddProjectView: View {
         var targetTime: Date = Date()
         var priority: Priority = .none
         var hasTarget: Bool = false
-        var targetValue: Double = 1.0
-        var targetValueString: String = "1"
+        var targetValue: Double = 0
+        var targetValueString: String = ""
         var targetUnit: TargetUnit = .hour
     }
 
@@ -89,9 +89,9 @@ struct AddProjectView: View {
                                     .foregroundStyle(.secondary)
 
                                 if entry.hasTarget {
-                                    TextField("", text: $entry.targetValueString)
+                                    TextField("Value", text: $entry.targetValueString)
                                         .keyboardType(.decimalPad)
-                                        .frame(width: 50)
+                                        .frame(width: 60)
                                         .padding(.horizontal, 8)
                                         .padding(.vertical, 6)
                                         .background(.ultraThinMaterial)

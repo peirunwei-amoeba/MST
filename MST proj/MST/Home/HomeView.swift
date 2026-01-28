@@ -16,6 +16,17 @@ import SwiftUI
 import SwiftData
 import AVFoundation
 
+// MARK: - Glass Button Style
+
+struct GlassButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.92 : 1.0)
+            .opacity(configuration.isPressed ? 0.8 : 1.0)
+            .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
+    }
+}
+
 struct HomeView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Assignment.dueDate) private var assignments: [Assignment]
@@ -197,10 +208,11 @@ struct HomeView: View {
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(themeManager.accentColor)
                         .padding(12)
-                        .glassEffect(.regular)
+                        .glassEffect(.regular.interactive())
                         .clipShape(Circle())
                         .contentShape(Circle())
                 }
+                .buttonStyle(GlassButtonStyle())
             }
             .padding(.horizontal, 4)
 
@@ -227,8 +239,8 @@ struct HomeView: View {
                                 ))
                             }
                         }
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 4)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 12)
                     }
                 }
             }
@@ -357,10 +369,11 @@ struct HomeView: View {
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(themeManager.accentColor)
                         .padding(12)
-                        .glassEffect(.regular)
+                        .glassEffect(.regular.interactive())
                         .clipShape(Circle())
                         .contentShape(Circle())
                 }
+                .buttonStyle(GlassButtonStyle())
             }
             .padding(.horizontal, 4)
 
@@ -548,10 +561,11 @@ struct HomeView: View {
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(themeManager.accentColor)
                         .padding(12)
-                        .glassEffect(.regular)
+                        .glassEffect(.regular.interactive())
                         .clipShape(Circle())
                         .contentShape(Circle())
                 }
+                .buttonStyle(GlassButtonStyle())
             }
             .padding(.horizontal, 4)
 
@@ -724,7 +738,7 @@ struct ConcentricProjectRow: View {
 
     private let maxVisibleGoals = 5
     private let dotSize: CGFloat = 20
-    private let columnWidth: CGFloat = 48
+    private let columnWidth: CGFloat = 56  // Increased from 48 for better spacing
     private let mainCheckmarkSize: CGFloat = 28
 
     // Next incomplete goal for the main checkmark and date display
@@ -759,14 +773,17 @@ struct ConcentricProjectRow: View {
             HStack(spacing: 12) {
                 // Main checkmark button for next goal
                 Button {
-                    // Call toggle first to trigger color change
+                    // Capture goal ID BEFORE toggle (since nextGoal will change after toggle)
+                    let goalIdToAnimate = nextGoal?.id
+
+                    // Call toggle to trigger color change
                     onToggleNextGoal()
 
                     // Then delay the twist animation slightly
-                    if let goal = nextGoal {
+                    if let goalId = goalIdToAnimate {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                             withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
-                                animatingGoalId = goal.id
+                                animatingGoalId = goalId
                             }
                         }
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
@@ -887,6 +904,7 @@ struct ConcentricProjectRow: View {
                                 .foregroundStyle(goal.isCompleted ? .secondary : .primary)
                                 .lineLimit(2)
                                 .multilineTextAlignment(.center)
+                                .padding(.horizontal, 2)
 
                             // Target value/unit if present
                             if let target = goal.formattedTarget {
@@ -895,7 +913,7 @@ struct ConcentricProjectRow: View {
                                     .foregroundStyle(.purple)
                             }
                         }
-                        .frame(width: columnWidth + 8, alignment: .center)
+                        .frame(width: columnWidth, alignment: .center)
                         .fixedSize(horizontal: false, vertical: true)
                     }
                     .frame(width: dotSize)

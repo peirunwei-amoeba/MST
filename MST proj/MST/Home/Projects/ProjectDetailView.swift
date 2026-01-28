@@ -219,7 +219,7 @@ struct HorizontalTimelineView: View {
     let onToggleComplete: (Goal) -> Void
 
     private let dotSize: CGFloat = 36
-    private let columnWidth: CGFloat = 90
+    private let columnWidth: CGFloat = 100  // Increased from 90 for better spacing
     private let lineHeight: CGFloat = 4
 
     // Check if a goal at index can be toggled (all previous must be complete, or it's already complete)
@@ -298,11 +298,14 @@ struct GoalColumnView: View {
         VStack(spacing: 8) {
             // Big checkmark button - colored by priority when incomplete
             Button {
-                // Call toggle first to trigger color change
+                // Capture pre-toggle state BEFORE calling toggle
+                let wasCompleted = goal.isCompleted
+
+                // Call toggle to trigger state change
                 onToggleComplete()
 
-                // Then delay the twist animation slightly
-                if !goal.isCompleted && isEnabled {
+                // Trigger animation for completing (not uncompleting)
+                if !wasCompleted && isEnabled {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
                             animatingCheckmark = true
@@ -332,6 +335,7 @@ struct GoalColumnView: View {
                     .foregroundStyle(goal.isCompleted ? .secondary : (isEnabled ? .primary : .secondary))
                     .lineLimit(2)
                     .multilineTextAlignment(.center)
+                    .padding(.horizontal, 4)
 
                 // Target value/unit if present
                 if let target = goal.formattedTarget {
@@ -340,7 +344,7 @@ struct GoalColumnView: View {
                         .foregroundStyle(.purple)
                 }
             }
-            .frame(width: columnWidth + 10, alignment: .center)
+            .frame(width: columnWidth - 4, alignment: .center)  // Slightly smaller than column to prevent edge collision
             .fixedSize(horizontal: false, vertical: true)
 
             // Date

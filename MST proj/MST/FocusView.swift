@@ -16,6 +16,17 @@ import SwiftUI
 import SwiftData
 import AVFoundation
 
+// MARK: - Glass Button Style (for Focus tab controls)
+
+struct FocusGlassButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.92 : 1.0)
+            .opacity(configuration.isPressed ? 0.8 : 1.0)
+            .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
+    }
+}
+
 // MARK: - FocusTask Enum
 
 enum FocusTask: Identifiable, Equatable {
@@ -113,6 +124,10 @@ struct FocusView: View {
     @State private var isRunning: Bool = false
     @State private var isPaused: Bool = false
     @State private var timer: Timer?
+    @State private var timerEndTime: Date?  // Track when timer should end (for background support)
+
+    // Scene phase for background handling
+    @Environment(\.scenePhase) private var scenePhase
 
     // Task state
     @State private var selectedTask: FocusTask?
@@ -233,6 +248,79 @@ struct FocusView: View {
             )
         }
         .animation(.easeInOut(duration: 0.4), value: showCompletionOverlay)
+        .onChange(of: isRunning) { _, _ in
+            updateIdleTimerState()
+        }
+        .onChange(of: isPaused) { _, _ in
+            updateIdleTimerState()
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            handleScenePhaseChange(newPhase)
+        }
+        .onDisappear {
+            // Re-enable idle timer when leaving the view
+            UIApplication.shared.isIdleTimerDisabled = false
+        }
+    }
+
+    // MARK: - Background Timer Support
+
+    private func handleScenePhaseChange(_ newPhase: ScenePhase) {
+        switch newPhase {
+        case .active:
+            // App returned to foreground - recalculate timer if running
+            if isRunning, let endTime = timerEndTime {
+                let now = Date()
+                if now >= endTime {
+                    // Timer should have completed in background
+                    remainingSeconds = 0
+                    timerCompleted()
+                } else {
+                    // Update remaining time based on end time
+                    let remaining = Int(endTime.timeIntervalSince(now))
+                    remainingSeconds = max(0, remaining)
+
+                    // Update the ring positions
+                    let totalMins = remainingSeconds / 60
+                    selectedHours = totalMins / 60
+                    selectedMinutes = totalMins % 60
+
+                    // Restart the timer
+                    timer?.invalidate()
+                    timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
+                        if remainingSeconds > 0 {
+                            remainingSeconds -= 1
+                            let totalMins = remainingSeconds / 60
+                            let newHours = totalMins / 60
+                            let newMins = totalMins % 60
+                            if newHours != selectedHours || newMins != selectedMinutes {
+                                withAnimation(.linear(duration: 0.5)) {
+                                    selectedHours = newHours
+                                    selectedMinutes = newMins
+                                }
+                            }
+                        } else {
+                            timerCompleted()
+                        }
+                    }
+                }
+            }
+        case .background:
+            // App going to background - timer will stop but we have timerEndTime saved
+            timer?.invalidate()
+            timer = nil
+        case .inactive:
+            break
+        @unknown default:
+            break
+        }
+    }
+
+    // MARK: - Idle Timer Management
+
+    private func updateIdleTimerState() {
+        let shouldDisableIdleTimer = themeManager.keepScreenOnDuringFocus && (isRunning || isPaused)
+        UIApplication.shared.isIdleTimerDisabled = shouldDisableIdleTimer
     }
 
     // MARK: - Task Picker Button
@@ -271,10 +359,10 @@ struct FocusView: View {
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 14)
-            .glassEffect(.regular)
+            .glassEffect(.regular.interactive())
             .clipShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(FocusGlassButtonStyle())
     }
 
     // MARK: - Control Buttons
@@ -291,10 +379,10 @@ struct FocusView: View {
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(.primary)
                         .frame(width: 52, height: 52)
-                        .glassEffect(.regular)
+                        .glassEffect(.regular.interactive())
                         .clipShape(Circle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(FocusGlassButtonStyle())
             }
 
             // Main start/pause button
@@ -318,10 +406,10 @@ struct FocusView: View {
                 .foregroundStyle(.primary)
                 .padding(.horizontal, 36)
                 .padding(.vertical, 16)
-                .glassEffect(.regular)
+                .glassEffect(.regular.interactive())
                 .clipShape(Capsule())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(FocusGlassButtonStyle())
             .disabled(totalSelectedMinutes == 0 && !isPaused)
             .opacity(totalSelectedMinutes == 0 && !isPaused ? 0.5 : 1)
         }
@@ -333,6 +421,9 @@ struct FocusView: View {
         remainingSeconds = totalSelectedMinutes * 60
         isRunning = true
         isPaused = false
+
+        // Set the end time for background tracking
+        timerEndTime = Date().addingTimeInterval(TimeInterval(remainingSeconds))
 
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
 
@@ -362,6 +453,7 @@ struct FocusView: View {
         timer = nil
         isRunning = false
         isPaused = true
+        timerEndTime = nil  // Clear end time when paused
 
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
@@ -369,6 +461,9 @@ struct FocusView: View {
     private func resumeTimer() {
         isRunning = true
         isPaused = false
+
+        // Set the end time for background tracking
+        timerEndTime = Date().addingTimeInterval(TimeInterval(remainingSeconds))
 
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
 
@@ -397,6 +492,7 @@ struct FocusView: View {
         timer = nil
         isRunning = false
         isPaused = false
+        timerEndTime = nil
         remainingSeconds = 0
 
         // Reset to default or task time

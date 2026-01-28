@@ -71,6 +71,7 @@ enum AccentColorOption: String, CaseIterable, Identifiable {
 class ThemeManager: ObservableObject {
     @AppStorage("selectedTheme") private var selectedThemeRaw: String = AppTheme.system.rawValue
     @AppStorage("selectedAccentColor") private var selectedAccentColorRaw: String = AccentColorOption.blue.rawValue
+    @AppStorage("keepScreenOnDuringFocus") private var keepScreenOnDuringFocusRaw: Bool = true
 
     var selectedTheme: AppTheme {
         get { AppTheme(rawValue: selectedThemeRaw) ?? .system }
@@ -102,6 +103,14 @@ class ThemeManager: ObservableObject {
 
     var cardBackgroundColor: Color {
         Color(.secondarySystemGroupedBackground)
+    }
+
+    var keepScreenOnDuringFocus: Bool {
+        get { keepScreenOnDuringFocusRaw }
+        set {
+            keepScreenOnDuringFocusRaw = newValue
+            objectWillChange.send()
+        }
     }
 }
 
