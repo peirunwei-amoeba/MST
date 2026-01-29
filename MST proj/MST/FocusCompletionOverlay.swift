@@ -17,6 +17,8 @@ import AVFoundation
 
 struct FocusCompletionOverlay: View {
     let taskTitle: String?
+    let hasTask: Bool
+    let alarmSound: TimerAlarmSound
     let onComplete: () -> Void
     let onDismiss: () -> Void
 
@@ -29,6 +31,7 @@ struct FocusCompletionOverlay: View {
     @State private var hapticTimer: Timer?
     @State private var holdStartTime: Date?
     @State private var isCompleted = false
+    @State private var noTaskAppeared = false
 
     private let holdDuration: Double = 1.2
     private let checkmarkSize: CGFloat = 120
@@ -40,98 +43,153 @@ struct FocusCompletionOverlay: View {
             Color.black.opacity(0.9)
                 .ignoresSafeArea()
 
-            VStack(spacing: 40) {
-                Spacer()
-
-                // Title
-                VStack(spacing: 12) {
-                    Text("Session Complete!")
-                        .font(.title.weight(.semibold))
-                        .foregroundStyle(.white)
-
-                    if let title = taskTitle {
-                        Text(title)
-                            .font(.title3)
-                            .foregroundStyle(.white.opacity(0.7))
-                            .multilineTextAlignment(.center)
-                            .lineLimit(2)
-                    }
-                }
-
-                // Giant checkmark with progress ring
-                ZStack {
-                    // Background ring
-                    Circle()
-                        .stroke(Color.white.opacity(0.15), lineWidth: 6)
-                        .frame(width: checkmarkSize + 30, height: checkmarkSize + 30)
-
-                    // Progress ring (fills during hold)
-                    if holdProgress > 0 && isHolding {
-                        Circle()
-                            .trim(from: 0, to: holdProgress)
-                            .stroke(
-                                Color.green,
-                                style: StrokeStyle(lineWidth: 6, lineCap: .round)
-                            )
-                            .frame(width: checkmarkSize + 30, height: checkmarkSize + 30)
-                            .rotationEffect(.degrees(-90))
-                    }
-
-                    // Ripple effect on completion
-                    if showRipple {
-                        Circle()
-                            .stroke(Color.green.opacity(0.6), lineWidth: 4)
-                            .frame(width: checkmarkSize + 30, height: checkmarkSize + 30)
-                            .scaleEffect(showRipple ? 2.0 : 1.0)
-                            .opacity(showRipple ? 0 : 1)
-                    }
-
-                    // Checkmark icon
-                    Image(systemName: completionBounce ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: checkmarkSize, weight: .medium))
-                        .foregroundStyle(completionBounce ? .green : (isHolding && holdProgress > 0) ? .green.opacity(0.4 + holdProgress * 0.6) : .white.opacity(0.4))
-                        .contentTransition(.symbolEffect(.replace.magic(fallback: .replace)))
-                        .scaleEffect(animatingBounce ? 1.35 : (isHolding ? 1.0 + holdProgress * 0.15 : 1.0))
-                        .rotationEffect(.degrees(animatingBounce ? 10 : (isHolding ? holdProgress * 8 : 0)))
-                }
-                .contentShape(Circle())
-                .onLongPressGesture(minimumDuration: holdDuration, maximumDistance: 80) {
-                    // Long press completed
-                    completeSession()
-                } onPressingChanged: { pressing in
-                    if isCompleted { return }
-
-                    if pressing {
-                        startHolding()
-                    } else {
-                        if !completionBounce {
-                            cancelHolding()
-                        }
-                    }
-                }
-
-                // Instructions
-                Text(isHolding ? "Keep holding..." : "Hold to complete")
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(.white.opacity(0.5))
-                    .animation(.easeInOut, value: isHolding)
-
-                Spacer()
-
-                // Dismiss button
-                Button {
-                    onDismiss()
-                } label: {
-                    Text("Skip")
-                        .font(.body.weight(.medium))
-                        .foregroundStyle(.white.opacity(0.5))
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 12)
-                }
-                .padding(.bottom, 40)
+            if hasTask {
+                taskCompletionContent
+            } else {
+                noTaskContent
             }
-            .padding(.horizontal, 32)
         }
+    }
+
+    // MARK: - No Task Content
+
+    private var noTaskContent: some View {
+        VStack(spacing: 40) {
+            Spacer()
+
+            VStack(spacing: 12) {
+                Text("Session Complete!")
+                    .font(.title.weight(.semibold))
+                    .foregroundStyle(.white)
+
+                Text("Great focus session!")
+                    .font(.title3)
+                    .foregroundStyle(.white.opacity(0.7))
+            }
+
+            // Static green checkmark
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: checkmarkSize, weight: .medium))
+                .foregroundStyle(.green)
+                .scaleEffect(noTaskAppeared ? 1.0 : 0.5)
+                .opacity(noTaskAppeared ? 1.0 : 0)
+
+            Spacer()
+
+            Button {
+                onDismiss()
+            } label: {
+                Text("Done")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 40)
+                    .padding(.vertical, 14)
+                    .background(.green, in: Capsule())
+            }
+            .padding(.bottom, 40)
+        }
+        .padding(.horizontal, 32)
+        .onAppear {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.6)) {
+                noTaskAppeared = true
+            }
+        }
+    }
+
+    // MARK: - Task Completion Content
+
+    private var taskCompletionContent: some View {
+        VStack(spacing: 40) {
+            Spacer()
+
+            // Title
+            VStack(spacing: 12) {
+                Text("Session Complete!")
+                    .font(.title.weight(.semibold))
+                    .foregroundStyle(.white)
+
+                if let title = taskTitle {
+                    Text(title)
+                        .font(.title3)
+                        .foregroundStyle(.white.opacity(0.7))
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                }
+            }
+
+            // Giant checkmark with progress ring
+            ZStack {
+                // Background ring
+                Circle()
+                    .stroke(Color.white.opacity(0.15), lineWidth: 6)
+                    .frame(width: checkmarkSize + 30, height: checkmarkSize + 30)
+
+                // Progress ring (fills during hold)
+                if holdProgress > 0 && isHolding {
+                    Circle()
+                        .trim(from: 0, to: holdProgress)
+                        .stroke(
+                            Color.green,
+                            style: StrokeStyle(lineWidth: 6, lineCap: .round)
+                        )
+                        .frame(width: checkmarkSize + 30, height: checkmarkSize + 30)
+                        .rotationEffect(.degrees(-90))
+                }
+
+                // Ripple effect on completion
+                if showRipple {
+                    Circle()
+                        .stroke(Color.green.opacity(0.6), lineWidth: 4)
+                        .frame(width: checkmarkSize + 30, height: checkmarkSize + 30)
+                        .scaleEffect(showRipple ? 2.0 : 1.0)
+                        .opacity(showRipple ? 0 : 1)
+                }
+
+                // Checkmark icon
+                Image(systemName: completionBounce ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: checkmarkSize, weight: .medium))
+                    .foregroundStyle(completionBounce ? .green : (isHolding && holdProgress > 0) ? .green.opacity(0.4 + holdProgress * 0.6) : .white.opacity(0.4))
+                    .contentTransition(.symbolEffect(.replace.magic(fallback: .replace)))
+                    .scaleEffect(animatingBounce ? 1.35 : (isHolding ? 1.0 + holdProgress * 0.15 : 1.0))
+                    .rotationEffect(.degrees(animatingBounce ? 10 : (isHolding ? holdProgress * 8 : 0)))
+            }
+            .contentShape(Circle())
+            .onLongPressGesture(minimumDuration: holdDuration, maximumDistance: 80) {
+                // Long press completed
+                completeSession()
+            } onPressingChanged: { pressing in
+                if isCompleted { return }
+
+                if pressing {
+                    startHolding()
+                } else {
+                    if !completionBounce {
+                        cancelHolding()
+                    }
+                }
+            }
+
+            // Instructions
+            Text(isHolding ? "Keep holding..." : "Hold to complete")
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.white.opacity(0.5))
+                .animation(.easeInOut, value: isHolding)
+
+            Spacer()
+
+            // Dismiss button
+            Button {
+                onDismiss()
+            } label: {
+                Text("Skip")
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(.white.opacity(0.5))
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 12)
+            }
+            .padding(.bottom, 40)
+        }
+        .padding(.horizontal, 32)
     }
 
     // MARK: - Holding Logic
@@ -180,7 +238,7 @@ struct FocusCompletionOverlay: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             let notificationFeedback = UINotificationFeedbackGenerator()
             notificationFeedback.notificationOccurred(.success)
-            AudioServicesPlaySystemSound(1407)
+            alarmSound.play()
         }
 
         // FIRST: Show filled checkmark (turns green)
@@ -266,9 +324,21 @@ struct FocusCompletionOverlay: View {
     }
 }
 
-#Preview {
+#Preview("With Task") {
     FocusCompletionOverlay(
         taskTitle: "Read 30 pages",
+        hasTask: true,
+        alarmSound: .radar,
+        onComplete: {},
+        onDismiss: {}
+    )
+}
+
+#Preview("No Task") {
+    FocusCompletionOverlay(
+        taskTitle: nil,
+        hasTask: false,
+        alarmSound: .radar,
         onComplete: {},
         onDismiss: {}
     )

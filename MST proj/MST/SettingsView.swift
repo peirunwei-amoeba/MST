@@ -13,6 +13,7 @@
 //
 
 import SwiftUI
+import AudioToolbox
 
 struct SettingsView: View {
     @EnvironmentObject private var themeManager: ThemeManager
@@ -54,6 +55,17 @@ struct SettingsView: View {
                         get: { themeManager.keepScreenOnDuringFocus },
                         set: { themeManager.keepScreenOnDuringFocus = $0 }
                     ))
+
+                    NavigationLink {
+                        TimerSoundPickerView()
+                    } label: {
+                        HStack {
+                            Text("Alarm Sound")
+                            Spacer()
+                            Text(themeManager.timerAlarmSound.rawValue)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
 
                 // About Section
@@ -146,6 +158,61 @@ struct ColorOptionButton: View {
             }
         }
         .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Timer Sound Picker View
+
+struct TimerSoundPickerView: View {
+    @EnvironmentObject private var themeManager: ThemeManager
+    @State private var previewSoundID: SystemSoundID = 0
+
+    var body: some View {
+        List {
+            ForEach(TimerAlarmSound.allCases) { sound in
+                Button {
+                    previewSound(sound)
+                    themeManager.timerAlarmSound = sound
+                } label: {
+                    HStack {
+                        Text(sound.rawValue)
+                            .foregroundStyle(.primary)
+
+                        Spacer()
+
+                        if themeManager.timerAlarmSound == sound {
+                            Image(systemName: "checkmark")
+                                .foregroundStyle(themeManager.accentColor)
+                                .fontWeight(.semibold)
+                        }
+                    }
+                }
+            }
+        }
+        .navigationTitle("Alarm Sound")
+        .navigationBarTitleDisplayMode(.inline)
+        .onDisappear {
+            // Clean up any playing sound
+            if previewSoundID != 0 {
+                AudioServicesDisposeSystemSoundID(previewSoundID)
+            }
+        }
+    }
+
+    private func previewSound(_ sound: TimerAlarmSound) {
+        // Dispose previous sound
+        if previewSoundID != 0 {
+            AudioServicesDisposeSystemSoundID(previewSoundID)
+            previewSoundID = 0
+        }
+
+        let path = "/System/Library/Audio/UISounds/\(sound.fileName)"
+        let url = URL(fileURLWithPath: path)
+
+        guard FileManager.default.fileExists(atPath: path) else { return }
+
+        AudioServicesCreateSystemSoundID(url as CFURL, &previewSoundID)
+        AudioServicesPlaySystemSound(previewSoundID)
     }
 }
 

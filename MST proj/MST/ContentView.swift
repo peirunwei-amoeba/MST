@@ -17,31 +17,91 @@ import SwiftData
 
 struct ContentView: View {
     @EnvironmentObject private var themeManager: ThemeManager
+    @Environment(FocusTimerManager.self) private var focusTimerManager
 
     var body: some View {
         TabView {
-            HomeView()
-                .tabItem {
-                    Label("Home", systemImage: "house.fill")
-                }
+            Tab("Home", systemImage: "house.fill") {
+                HomeView()
+            }
 
-            FocusView()
-                .tabItem {
-                    Label("Focus", systemImage: "timer")
-                }
+            Tab("Focus", systemImage: "timer") {
+                FocusView()
+            }
 
-            SettingsView()
-                .tabItem {
-                    Label("Settings", systemImage: "gearshape.fill")
-                }
+            Tab("Settings", systemImage: "gearshape.fill") {
+                SettingsView()
+            }
         }
+        .tabViewBottomAccessory(isEnabled: focusTimerManager.isActive) {
+            TimerAccessoryView()
+        }
+        .tabBarMinimizeBehavior(.onScrollDown)
         .tint(themeManager.accentColor)
         .preferredColorScheme(themeManager.colorScheme)
     }
 }
 
+// MARK: - Timer Accessory View
+
+struct TimerAccessoryView: View {
+    @Environment(FocusTimerManager.self) private var timerManager
+    @Environment(\.tabViewBottomAccessoryPlacement) private var placement
+
+    var body: some View {
+        switch placement {
+        case .expanded:
+            expandedContent
+        default:
+            inlineContent
+        }
+    }
+
+    // Compact view for inline/minimized state - just the countdown
+    private var inlineContent: some View {
+        Label {
+            Text(timerManager.formattedTimeRemaining)
+                .monospacedDigit()
+                .contentTransition(.numericText())
+        } icon: {
+            Image(systemName: timerManager.isPaused ? "pause.fill" : "timer")
+        }
+        .font(.caption.weight(.medium))
+    }
+
+    // Full view for expanded state - countdown + task name
+    private var expandedContent: some View {
+        HStack(spacing: 10) {
+            Image(systemName: timerManager.isPaused ? "pause.circle.fill" : "timer")
+                .font(.body)
+                .foregroundStyle(timerManager.isPaused ? .orange : .accentColor)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(timerManager.formattedTimeRemaining)
+                    .font(.subheadline.weight(.semibold))
+                    .monospacedDigit()
+                    .contentTransition(.numericText())
+
+                if let title = timerManager.selectedTaskTitle {
+                    Text(title)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer()
+
+            Text(timerManager.isPaused ? "Paused" : "Focusing")
+                .font(.caption.weight(.medium))
+                .foregroundStyle(timerManager.isPaused ? .orange : .green)
+        }
+    }
+}
+
 #Preview {
     ContentView()
-        .modelContainer(for: Assignment.self, inMemory: true)
+        .modelContainer(for: [Assignment.self, Project.self, Goal.self, Habit.self, HabitEntry.self], inMemory: true)
         .environmentObject(ThemeManager())
+        .environment(FocusTimerManager())
 }

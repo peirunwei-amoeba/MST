@@ -113,7 +113,7 @@ struct ConcentricHabitCard: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
-                    // Streak indicator
+                    // Streak and total indicator
                     HStack(spacing: 2) {
                         if habit.currentStreak > 0 {
                             Image(systemName: "flame.fill")
@@ -122,10 +122,13 @@ struct ConcentricHabitCard: View {
                             Text("\(habit.currentStreak)")
                                 .font(.caption2.weight(.semibold))
                                 .foregroundStyle(.orange)
-                        } else {
-                            Text(" ")
+                            Text("·")
                                 .font(.caption2)
+                                .foregroundStyle(.secondary)
                         }
+                        Text("\(habit.completedDaysCount) done")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
                     }
                     .frame(height: 14)
                 }
