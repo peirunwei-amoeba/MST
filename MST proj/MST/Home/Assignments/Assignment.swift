@@ -33,6 +33,7 @@ final class Assignment {
     var colorCode: String?
     var targetValue: Double?
     var targetUnitRaw: String = ""
+    var pointsAwarded: Bool = false
 
     // Computed: Unit enum
     var targetUnit: TargetUnit {

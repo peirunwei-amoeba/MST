@@ -20,6 +20,7 @@ final class HabitEntry {
     @Attribute(.unique) var id: UUID
     var date: Date
     var value: Double
+    var pointsAwarded: Bool = false
     var habit: Habit?
 
     init(

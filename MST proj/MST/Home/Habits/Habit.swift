@@ -194,6 +194,29 @@ final class Habit {
         return entries.first { calendar.isDate($0.date, inSameDayAs: today) }
     }
 
+    // MARK: - Points Anti-Abuse
+
+    /// Whether points can be awarded today (no entry today has pointsAwarded == true)
+    var canAwardPointsToday: Bool {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        return !entries.contains {
+            calendar.isDate($0.date, inSameDayAs: today) && $0.pointsAwarded
+        }
+    }
+
+    /// Whether points can be awarded this week (no entry this week has pointsAwarded == true)
+    var canAwardPointsThisWeek: Bool {
+        let calendar = Calendar.current
+        guard let weekStart = calendar.dateInterval(of: .weekOfYear, for: Date())?.start else {
+            return true
+        }
+        let weekEnd = calendar.date(byAdding: .day, value: 7, to: weekStart) ?? Date()
+        return !entries.contains {
+            $0.date >= weekStart && $0.date < weekEnd && $0.pointsAwarded
+        }
+    }
+
     // MARK: - Methods
 
     func completeToday(value: Double? = nil) {

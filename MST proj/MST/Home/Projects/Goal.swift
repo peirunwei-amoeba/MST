@@ -27,6 +27,7 @@ final class Goal {
     var project: Project?
     var targetValue: Double?
     var targetUnitRaw: String = ""
+    var pointsAwarded: Bool = false
 
     // Computed property for Priority enum
     var priority: Priority {
