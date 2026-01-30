@@ -106,7 +106,6 @@ enum FocusTask: Identifiable, Equatable {
 struct FocusView: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var themeManager: ThemeManager
-    @Environment(FocusTimerManager.self) private var timerManager
 
     // Data queries
     @Query(filter: #Predicate<Assignment> { !$0.isCompleted })
@@ -282,7 +281,6 @@ struct FocusView: View {
                     // Update remaining time based on end time
                     let remaining = Int(endTime.timeIntervalSince(now))
                     remainingSeconds = max(0, remaining)
-                    timerManager.remainingSeconds = remainingSeconds
 
                     // Update the ring positions
                     let totalMins = remainingSeconds / 60
@@ -294,7 +292,6 @@ struct FocusView: View {
                     timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
                         if remainingSeconds > 0 {
                             remainingSeconds -= 1
-                            timerManager.remainingSeconds = remainingSeconds
                             let totalMins = remainingSeconds / 60
                             let newHours = totalMins / 60
                             let newMins = totalMins % 60
@@ -422,13 +419,6 @@ struct FocusView: View {
 
     // MARK: - Timer Functions
 
-    private func syncTimerManager() {
-        timerManager.isRunning = isRunning
-        timerManager.isPaused = isPaused
-        timerManager.remainingSeconds = remainingSeconds
-        timerManager.selectedTaskTitle = selectedTask?.title
-    }
-
     private func startTimer() {
         remainingSeconds = totalSelectedMinutes * 60
         isRunning = true
@@ -437,13 +427,11 @@ struct FocusView: View {
         // Set the end time for background tracking
         timerEndTime = Date().addingTimeInterval(TimeInterval(remainingSeconds))
 
-        syncTimerManager()
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
 
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
             if remainingSeconds > 0 {
                 remainingSeconds -= 1
-                timerManager.remainingSeconds = remainingSeconds
 
                 // Update ring positions smoothly every minute
                 let totalMins = remainingSeconds / 60
@@ -469,7 +457,6 @@ struct FocusView: View {
         isPaused = true
         timerEndTime = nil  // Clear end time when paused
 
-        syncTimerManager()
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
@@ -480,13 +467,11 @@ struct FocusView: View {
         // Set the end time for background tracking
         timerEndTime = Date().addingTimeInterval(TimeInterval(remainingSeconds))
 
-        syncTimerManager()
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
 
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
             if remainingSeconds > 0 {
                 remainingSeconds -= 1
-                timerManager.remainingSeconds = remainingSeconds
 
                 let totalMins = remainingSeconds / 60
                 let newHours = totalMins / 60
@@ -511,7 +496,6 @@ struct FocusView: View {
         isPaused = false
         timerEndTime = nil
         remainingSeconds = 0
-        syncTimerManager()
 
         // Reset to default or task time
         if let task = selectedTask, let duration = task.durationInMinutes {
@@ -536,7 +520,6 @@ struct FocusView: View {
         timer = nil
         isRunning = false
         isPaused = false
-        syncTimerManager()
 
         // Haptic burst and alarm sound
         UINotificationFeedbackGenerator().notificationOccurred(.success)
@@ -552,7 +535,6 @@ struct FocusView: View {
 
     private func selectTask(_ task: FocusTask) {
         selectedTask = task
-        timerManager.selectedTaskTitle = task.title
 
         if let duration = task.durationInMinutes {
             exactTimeMinutes = duration
@@ -601,7 +583,6 @@ struct FocusView: View {
         selectedHours = 0
         selectedMinutes = 25
         exactTimeMinutes = 0
-        syncTimerManager()
     }
 }
 
@@ -611,5 +592,4 @@ struct FocusView: View {
     }
     .modelContainer(for: [Assignment.self, Project.self, Goal.self, Habit.self, HabitEntry.self], inMemory: true)
     .environmentObject(ThemeManager())
-    .environment(FocusTimerManager())
 }

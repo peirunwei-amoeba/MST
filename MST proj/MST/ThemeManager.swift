@@ -69,72 +69,53 @@ enum AccentColorOption: String, CaseIterable, Identifiable {
 }
 
 enum TimerAlarmSound: String, CaseIterable, Identifiable {
-    case beacon = "Beacon"
-    case bulletin = "Bulletin"
-    case chimes = "Chimes"
-    case circuit = "Circuit"
-    case constellation = "Constellation"
-    case cosmic = "Cosmic"
-    case crystals = "Crystals"
-    case hillside = "Hillside"
-    case illuminate = "Illuminate"
-    case nightOwl = "Night Owl"
-    case opening = "Opening"
-    case playtime = "Playtime"
-    case presto = "Presto"
-    case radar = "Radar"
-    case radiate = "Radiate"
-    case ripples = "Ripples"
-    case sencha = "Sencha"
-    case signal = "Signal"
-    case silk = "Silk"
-    case slowRise = "Slow Rise"
-    case stargaze = "Stargaze"
-    case summit = "Summit"
-    case twinkle = "Twinkle"
-    case uplift = "Uplift"
-    case waves = "Waves"
+    case none = "None"
+    case bloom = "Bloom"
+    case calypso = "Calypso"
+    case chooChoo = "Choo Choo"
+    case descent = "Descent"
+    case fanfare = "Fanfare"
+    case ladder = "Ladder"
+    case minuet = "Minuet"
+    case newsFlash = "News Flash"
+    case noir = "Noir"
+    case sherwoodForest = "Sherwood Forest"
+    case spell = "Spell"
+    case suspense = "Suspense"
+    case telegraph = "Telegraph"
+    case tiptoes = "Tiptoes"
+    case typewriters = "Typewriters"
+    case update = "Update"
 
     var id: String { rawValue }
 
-    /// The file name in /System/Library/Audio/UISounds/
-    var fileName: String {
+    /// System sound ID for each tone
+    var systemSoundID: SystemSoundID {
         switch self {
-        case .beacon: return "alarm_Beacon.caf"
-        case .bulletin: return "alarm_Bulletin.caf"
-        case .chimes: return "alarm_Chimes.caf"
-        case .circuit: return "alarm_Circuit.caf"
-        case .constellation: return "alarm_Constellation.caf"
-        case .cosmic: return "alarm_Cosmic.caf"
-        case .crystals: return "alarm_Crystals.caf"
-        case .hillside: return "alarm_Hillside.caf"
-        case .illuminate: return "alarm_Illuminate.caf"
-        case .nightOwl: return "alarm_Night_Owl.caf"
-        case .opening: return "alarm_Opening.caf"
-        case .playtime: return "alarm_Playtime.caf"
-        case .presto: return "alarm_Presto.caf"
-        case .radar: return "alarm_Radar.caf"
-        case .radiate: return "alarm_Radiate.caf"
-        case .ripples: return "alarm_Ripples.caf"
-        case .sencha: return "alarm_Sencha.caf"
-        case .signal: return "alarm_Signal.caf"
-        case .silk: return "alarm_Silk.caf"
-        case .slowRise: return "alarm_Slow_Rise.caf"
-        case .stargaze: return "alarm_Stargaze.caf"
-        case .summit: return "alarm_Summit.caf"
-        case .twinkle: return "alarm_Twinkle.caf"
-        case .uplift: return "alarm_Uplift.caf"
-        case .waves: return "alarm_Waves.caf"
+        case .none: return 0
+        case .bloom: return 1334
+        case .calypso: return 1335
+        case .chooChoo: return 1336
+        case .descent: return 1337
+        case .fanfare: return 1338
+        case .ladder: return 1339
+        case .minuet: return 1340
+        case .newsFlash: return 1341
+        case .noir: return 1342
+        case .sherwoodForest: return 1343
+        case .spell: return 1344
+        case .suspense: return 1345
+        case .telegraph: return 1346
+        case .tiptoes: return 1347
+        case .typewriters: return 1348
+        case .update: return 1349
         }
     }
 
-    /// Play the alarm sound
+    /// Play the alarm sound with vibration
     func play() {
-        let path = "/System/Library/Audio/UISounds/\(fileName)"
-        let url = URL(fileURLWithPath: path)
-        var soundID: SystemSoundID = 0
-        AudioServicesCreateSystemSoundID(url as CFURL, &soundID)
-        AudioServicesPlaySystemSound(soundID)
+        guard self != .none else { return }
+        AudioServicesPlayAlertSound(systemSoundID)
     }
 }
 
@@ -143,7 +124,7 @@ class ThemeManager: ObservableObject {
     @AppStorage("selectedTheme") private var selectedThemeRaw: String = AppTheme.system.rawValue
     @AppStorage("selectedAccentColor") private var selectedAccentColorRaw: String = AccentColorOption.blue.rawValue
     @AppStorage("keepScreenOnDuringFocus") private var keepScreenOnDuringFocusRaw: Bool = true
-    @AppStorage("timerAlarmSound") private var timerAlarmSoundRaw: String = TimerAlarmSound.radar.rawValue
+    @AppStorage("timerAlarmSound") private var timerAlarmSoundRaw: String = TimerAlarmSound.fanfare.rawValue
 
     var selectedTheme: AppTheme {
         get { AppTheme(rawValue: selectedThemeRaw) ?? .system }
@@ -186,7 +167,7 @@ class ThemeManager: ObservableObject {
     }
 
     var timerAlarmSound: TimerAlarmSound {
-        get { TimerAlarmSound(rawValue: timerAlarmSoundRaw) ?? .radar }
+        get { TimerAlarmSound(rawValue: timerAlarmSoundRaw) ?? .fanfare }
         set {
             timerAlarmSoundRaw = newValue.rawValue
             objectWillChange.send()

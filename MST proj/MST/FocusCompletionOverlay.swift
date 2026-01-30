@@ -328,7 +328,7 @@ struct FocusCompletionOverlay: View {
     FocusCompletionOverlay(
         taskTitle: "Read 30 pages",
         hasTask: true,
-        alarmSound: .radar,
+        alarmSound: .fanfare,
         onComplete: {},
         onDismiss: {}
     )
@@ -338,7 +338,7 @@ struct FocusCompletionOverlay: View {
     FocusCompletionOverlay(
         taskTitle: nil,
         hasTask: false,
-        alarmSound: .radar,
+        alarmSound: .fanfare,
         onComplete: {},
         onDismiss: {}
     )

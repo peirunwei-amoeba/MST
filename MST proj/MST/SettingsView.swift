@@ -13,7 +13,6 @@
 //
 
 import SwiftUI
-import AudioToolbox
 
 struct SettingsView: View {
     @EnvironmentObject private var themeManager: ThemeManager
@@ -165,13 +164,12 @@ struct ColorOptionButton: View {
 
 struct TimerSoundPickerView: View {
     @EnvironmentObject private var themeManager: ThemeManager
-    @State private var previewSoundID: SystemSoundID = 0
 
     var body: some View {
         List {
             ForEach(TimerAlarmSound.allCases) { sound in
                 Button {
-                    previewSound(sound)
+                    sound.play()
                     themeManager.timerAlarmSound = sound
                 } label: {
                     HStack {
@@ -191,28 +189,6 @@ struct TimerSoundPickerView: View {
         }
         .navigationTitle("Alarm Sound")
         .navigationBarTitleDisplayMode(.inline)
-        .onDisappear {
-            // Clean up any playing sound
-            if previewSoundID != 0 {
-                AudioServicesDisposeSystemSoundID(previewSoundID)
-            }
-        }
-    }
-
-    private func previewSound(_ sound: TimerAlarmSound) {
-        // Dispose previous sound
-        if previewSoundID != 0 {
-            AudioServicesDisposeSystemSoundID(previewSoundID)
-            previewSoundID = 0
-        }
-
-        let path = "/System/Library/Audio/UISounds/\(sound.fileName)"
-        let url = URL(fileURLWithPath: path)
-
-        guard FileManager.default.fileExists(atPath: path) else { return }
-
-        AudioServicesCreateSystemSoundID(url as CFURL, &previewSoundID)
-        AudioServicesPlaySystemSound(previewSoundID)
     }
 }
 

@@ -18,13 +18,11 @@ import SwiftData
 @main
 struct MSTApp: App {
     @StateObject private var themeManager = ThemeManager()
-    @State private var focusTimerManager = FocusTimerManager()
 
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environmentObject(themeManager)
-                .environment(focusTimerManager)
         }
         .modelContainer(for: [Assignment.self, Project.self, Goal.self, Habit.self, HabitEntry.self])
     }
