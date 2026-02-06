@@ -18,12 +18,14 @@ import SwiftData
 @main
 struct MSTApp: App {
     @StateObject private var themeManager = ThemeManager()
+    @StateObject private var pointsManager = PointsManager()
 
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environmentObject(themeManager)
+                .environmentObject(pointsManager)
         }
-        .modelContainer(for: [Assignment.self, Project.self, Goal.self, Habit.self, HabitEntry.self])
+        .modelContainer(for: [Assignment.self, Project.self, Goal.self, Habit.self, HabitEntry.self, PointsLedger.self, PointsTransaction.self])
     }
 }

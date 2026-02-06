@@ -19,7 +19,9 @@ import AVFoundation
 struct ProjectDetailView: View {
     @Bindable var project: Project
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var themeManager: ThemeManager
+    @EnvironmentObject private var pointsManager: PointsManager
 
     @State private var showingEditSheet = false
 
@@ -202,6 +204,11 @@ struct ProjectDetailView: View {
             goal.toggleCompletion()
         }
 
+        // Award points for goal completion
+        if !wasCompleted {
+            pointsManager.awardGoalPoints(goal: goal, modelContext: modelContext)
+        }
+
         // If all goals are now completed, mark project as completed
         if isLastGoal {
             withAnimation {
@@ -375,5 +382,6 @@ struct GoalColumnView: View {
             return project
         }())
         .environmentObject(ThemeManager())
+        .environmentObject(PointsManager())
     }
 }

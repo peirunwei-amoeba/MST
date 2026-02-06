@@ -106,6 +106,7 @@ enum FocusTask: Identifiable, Equatable {
 struct FocusView: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var themeManager: ThemeManager
+    @EnvironmentObject private var pointsManager: PointsManager
 
     // Data queries
     @Query(filter: #Predicate<Assignment> { !$0.isCompleted })
@@ -567,10 +568,13 @@ struct FocusView: View {
         switch task {
         case .assignment(let assignment):
             assignment.toggleCompletion()
+            pointsManager.awardAssignmentPoints(assignment: assignment, modelContext: modelContext)
         case .goal(let goal):
             goal.toggleCompletion()
+            pointsManager.awardGoalPoints(goal: goal, modelContext: modelContext)
         case .habit(let habit):
             habit.completeToday()
+            pointsManager.awardHabitPoints(habit: habit, modelContext: modelContext)
         }
 
         // Reset state
@@ -590,6 +594,7 @@ struct FocusView: View {
     NavigationStack {
         FocusView()
     }
-    .modelContainer(for: [Assignment.self, Project.self, Goal.self, Habit.self, HabitEntry.self], inMemory: true)
+    .modelContainer(for: [Assignment.self, Project.self, Goal.self, Habit.self, HabitEntry.self, PointsLedger.self, PointsTransaction.self], inMemory: true)
     .environmentObject(ThemeManager())
+    .environmentObject(PointsManager())
 }

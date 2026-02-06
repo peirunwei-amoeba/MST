@@ -33,6 +33,7 @@ struct HomeView: View {
     @Query(sort: \Project.deadline) private var projects: [Project]
     @Query(sort: \Habit.createdDate) private var habits: [Habit]
     @EnvironmentObject private var themeManager: ThemeManager
+    @EnvironmentObject private var pointsManager: PointsManager
 
     @State private var showingAddSheet = false
     @State private var selectedAssignment: Assignment?
@@ -86,6 +87,11 @@ struct HomeView: View {
             }
             .background(themeManager.backgroundColor)
             .navigationTitle("Welcome")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    PointsCapsuleView()
+                }
+            }
             .sheet(isPresented: $showingAddSheet) {
                 AddAssignmentView()
             }
@@ -318,6 +324,9 @@ struct HomeView: View {
             withAnimation {
                 habit.completeToday()
             }
+
+            // Award point for habit completion
+            pointsManager.awardHabitPoints(habit: habit, modelContext: modelContext)
 
             // Check if milestone was just reached
             if habit.justHitMilestone {
@@ -707,6 +716,9 @@ struct HomeView: View {
             nextGoal.toggleCompletion()
         }
 
+        // Award points for goal completion
+        pointsManager.awardGoalPoints(goal: nextGoal, modelContext: modelContext)
+
         // If project is now fully completed, trigger fade-out
         if isLastGoal {
             recentlyCompletedProjectIds.insert(project.id)
@@ -1095,6 +1107,7 @@ struct ConcentricAssignmentRow: View {
 
 #Preview {
     HomeView()
-        .modelContainer(for: [Assignment.self, Project.self, Goal.self, Habit.self, HabitEntry.self], inMemory: true)
+        .modelContainer(for: [Assignment.self, Project.self, Goal.self, Habit.self, HabitEntry.self, PointsLedger.self, PointsTransaction.self], inMemory: true)
         .environmentObject(ThemeManager())
+        .environmentObject(PointsManager())
 }
