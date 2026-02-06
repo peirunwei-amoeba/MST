@@ -57,7 +57,7 @@ struct PointsStatsView: View {
 
     private var remainingPointsCard: some View {
         VStack(spacing: 12) {
-            Image("Image")
+            Image("MST Full")
                 .resizable()
                 .aspectRatio(contentMode: .fit)
                 .frame(width: 56, height: 56)

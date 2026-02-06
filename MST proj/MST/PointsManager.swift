@@ -15,6 +15,7 @@
 import SwiftUI
 import SwiftData
 import Combine
+import UIKit
 
 @MainActor
 class PointsManager: ObservableObject {
