@@ -87,11 +87,6 @@ struct HomeView: View {
             }
             .background(themeManager.backgroundColor)
             .navigationTitle("Welcome")
-            .overlay {
-                PointsCapsuleView()
-                    .padding(.trailing, 20)
-                    .padding(.top, 2)
-            }
             .sheet(isPresented: $showingAddSheet) {
                 AddAssignmentView()
             }
@@ -184,6 +179,11 @@ struct HomeView: View {
                     }
                 )
             }
+        }
+        .overlay {
+            PointsCapsuleView()
+                .padding(.trailing, 20)
+                .padding(.top, 60)
         }
     }
 

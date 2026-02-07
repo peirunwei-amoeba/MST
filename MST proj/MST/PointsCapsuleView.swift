@@ -55,7 +55,7 @@ struct PointsCapsuleView: View {
         Color.clear
             .frame(
                 width: isExpanded ? 120 : 80,
-                height: isExpanded ? 120 : 32
+                height: isExpanded ? 120 : 36
             )
             .overlay {
                 ZStack {
