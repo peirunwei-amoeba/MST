@@ -23,8 +23,9 @@ struct PointsCapsuleView: View {
 
     // Animation states
     @State private var isExpanded = false
-    @State private var logoRotation: Double = 0
-    @State private var capsuleScale: CGFloat = 1.0
+    @State private var animatingBounce = false
+
+    private var cornerRadius: CGFloat { isExpanded ? 28 : 16 }
 
     var body: some View {
         Button {
@@ -32,9 +33,16 @@ struct PointsCapsuleView: View {
                 showingStats = true
             }
         } label: {
-            capsuleContent
+            content
         }
         .buttonStyle(GlassButtonStyle())
+        // topTrailing alignment: top-right corner stays pinned,
+        // glass expands downward and to the left
+        .frame(
+            maxWidth: .infinity,
+            maxHeight: .infinity,
+            alignment: .topTrailing
+        )
         .onChange(of: pointsManager.awardAnimationID) { _, _ in
             triggerAwardAnimation()
         }
@@ -43,72 +51,84 @@ struct PointsCapsuleView: View {
         }
     }
 
-    private var capsuleContent: some View {
-        // Single view tree — AnyLayout smoothly morphs between HStack ↔ VStack
-        let layout = isExpanded
-            ? AnyLayout(VStackLayout(spacing: 6))
-            : AnyLayout(HStackLayout(spacing: 6))
+    private var content: some View {
+        Color.clear
+            .frame(
+                width: isExpanded ? 120 : 80,
+                height: isExpanded ? 120 : 32
+            )
+            .overlay {
+                ZStack {
+                    // Compact pill content
+                    compactContent
+                        .opacity(isExpanded ? 0 : 1)
 
-        return layout {
-            // Logo — always present, just changes size
+                    // Expanded island content
+                    expandedContent
+                        .opacity(isExpanded ? 1 : 0)
+                }
+            }
+            .glassEffect(.clear, in: .rect(cornerRadius: cornerRadius))
+    }
+
+    // MARK: - Compact Pill Content
+
+    private var compactContent: some View {
+        HStack(spacing: 6) {
             Image("MST Full")
                 .resizable()
                 .aspectRatio(contentMode: .fit)
-                .frame(
-                    width: isExpanded ? 44 : 20,
-                    height: isExpanded ? 44 : 20
-                )
-                .rotation3DEffect(
-                    .degrees(logoRotation),
-                    axis: (x: 0, y: 1, z: 0),
-                    perspective: 0.5
-                )
+                .frame(width: 20, height: 20)
 
-            // Text — crossfade between remaining count and +N
-            ZStack {
-                Text("\(pointsManager.getRemainingPoints(modelContext: modelContext))")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .opacity(isExpanded ? 0 : 1)
-
-                Text("+\(pointsManager.lastAwardedPoints)")
-                    .font(.title3.weight(.bold))
-                    .foregroundStyle(.green)
-                    .opacity(isExpanded ? 1 : 0)
-            }
-            .contentTransition(.numericText())
+            Text("\(pointsManager.getRemainingPoints(modelContext: modelContext))")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.primary)
+                .contentTransition(.numericText())
         }
-        .padding(.horizontal, isExpanded ? 16 : 10)
-        .padding(.vertical, isExpanded ? 16 : 6)
-        .glassEffect(.regular.interactive())
-        .clipShape(RoundedRectangle(cornerRadius: isExpanded ? 24 : 20, style: .continuous))
-        .scaleEffect(capsuleScale)
     }
 
-    // MARK: - Award Animation (spin + pull up + smack down)
+    // MARK: - Expanded Island Content
+
+    private var expandedContent: some View {
+        VStack(spacing: 8) {
+            // Twist & smack only on the image
+            Image("MST Full")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 40, height: 40)
+                .scaleEffect(animatingBounce ? 1.35 : 1.0)
+                .rotationEffect(.degrees(animatingBounce ? 10 : 0))
+
+            Text("+\(pointsManager.lastAwardedPoints)")
+                .font(.title3.weight(.bold))
+                .foregroundStyle(.green)
+        }
+    }
+
+    // MARK: - Award Animation (twist & smack on image only)
 
     private func triggerAwardAnimation() {
-        // Phase 1: Spin logo + expand capsule + show +N
-        withAnimation(.easeInOut(duration: 0.5)) {
-            logoRotation += 360
-        }
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
+        // Phase 1: Expand glass downward-left
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
             isExpanded = true
-            capsuleScale = 1.15
         }
 
-        // Phase 2: Smack down (spring back to normal scale)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
-            withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
-                capsuleScale = 1.0
+        // Phase 2: Twist & smack the image
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
+                animatingBounce = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
+                    animatingBounce = false
+                }
             }
         }
 
-        // Phase 3: Collapse back to compact
+        // Phase 3: Collapse back to pill
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
                 isExpanded = false
-
             }
         }
 

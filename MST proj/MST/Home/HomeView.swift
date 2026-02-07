@@ -87,10 +87,10 @@ struct HomeView: View {
             }
             .background(themeManager.backgroundColor)
             .navigationTitle("Welcome")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    PointsCapsuleView()
-                }
+            .overlay {
+                PointsCapsuleView()
+                    .padding(.trailing, 20)
+                    .padding(.top, 2)
             }
             .sheet(isPresented: $showingAddSheet) {
                 AddAssignmentView()
