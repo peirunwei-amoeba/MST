@@ -34,7 +34,7 @@ struct StartFocusTimerTool: Tool {
             focusTimerBridge.requestedMinutes = minutes
             focusTimerBridge.shouldAutoStart = true
         }
-        let result = "Focus timer set to \(minutes) minutes. Switch to the Focus tab to start."
+        let result = "Focus timer set to \(minutes) minutes and starting now. You can manage it on the Focus tab."
         tracker.record(name: name, result: result)
         return ToolOutput(result)
     }
