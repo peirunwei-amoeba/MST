@@ -107,6 +107,7 @@ struct FocusView: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var themeManager: ThemeManager
     @EnvironmentObject private var pointsManager: PointsManager
+    @EnvironmentObject private var focusTimerBridge: FocusTimerBridge
 
     // Data queries
     @Query(filter: #Predicate<Assignment> { !$0.isCompleted })
@@ -263,6 +264,18 @@ struct FocusView: View {
         .onDisappear {
             // Re-enable idle timer when leaving the view
             UIApplication.shared.isIdleTimerDisabled = false
+        }
+        .onChange(of: focusTimerBridge.requestedMinutes) { _, newValue in
+            guard let minutes = newValue else { return }
+            let hours = minutes / 60
+            let mins = minutes % 60
+            selectedHours = hours
+            selectedMinutes = mins
+            exactTimeMinutes = 0
+            focusTimerBridge.requestedMinutes = nil
+            if focusTimerBridge.shouldAutoStart {
+                focusTimerBridge.shouldAutoStart = false
+            }
         }
     }
 
@@ -597,4 +610,5 @@ struct FocusView: View {
     .modelContainer(for: [Assignment.self, Project.self, Goal.self, Habit.self, HabitEntry.self, PointsLedger.self, PointsTransaction.self], inMemory: true)
     .environmentObject(ThemeManager())
     .environmentObject(PointsManager())
+    .environmentObject(FocusTimerBridge())
 }

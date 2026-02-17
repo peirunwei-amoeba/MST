@@ -125,6 +125,9 @@ class ThemeManager: ObservableObject {
     @AppStorage("selectedAccentColor") private var selectedAccentColorRaw: String = AccentColorOption.blue.rawValue
     @AppStorage("keepScreenOnDuringFocus") private var keepScreenOnDuringFocusRaw: Bool = true
     @AppStorage("timerAlarmSound") private var timerAlarmSoundRaw: String = TimerAlarmSound.fanfare.rawValue
+    @AppStorage("assistantName") var assistantName: String = "Spark"
+    @AppStorage("userName") var userName: String = ""
+    @AppStorage("hasCompletedOnboarding") var hasCompletedOnboarding: Bool = false
 
     var selectedTheme: AppTheme {
         get { AppTheme(rawValue: selectedThemeRaw) ?? .system }

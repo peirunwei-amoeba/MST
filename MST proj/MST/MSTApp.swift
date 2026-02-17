@@ -19,12 +19,17 @@ import SwiftData
 struct MSTApp: App {
     @StateObject private var themeManager = ThemeManager()
     @StateObject private var pointsManager = PointsManager()
+    @StateObject private var focusTimerBridge = FocusTimerBridge()
 
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environmentObject(themeManager)
                 .environmentObject(pointsManager)
+                .environmentObject(focusTimerBridge)
+                .onAppear {
+                    HabitReminderManager.requestNotificationPermission()
+                }
         }
         .modelContainer(for: [Assignment.self, Project.self, Goal.self, Habit.self, HabitEntry.self, PointsLedger.self, PointsTransaction.self])
     }

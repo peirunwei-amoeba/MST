@@ -17,26 +17,34 @@ import SwiftData
 
 struct ContentView: View {
     @EnvironmentObject private var themeManager: ThemeManager
+    @State private var showAssistant = false
 
     var body: some View {
-        TabView {
-            HomeView()
-                .tabItem {
-                    Label("Home", systemImage: "house.fill")
-                }
+        ZStack {
+            TabView {
+                HomeView()
+                    .tabItem {
+                        Label("Home", systemImage: "house.fill")
+                    }
 
-            FocusView()
-                .tabItem {
-                    Label("Focus", systemImage: "timer")
-                }
+                FocusView()
+                    .tabItem {
+                        Label("Focus", systemImage: "timer")
+                    }
 
-            SettingsView()
-                .tabItem {
-                    Label("Settings", systemImage: "gearshape.fill")
-                }
+                SettingsView()
+                    .tabItem {
+                        Label("Settings", systemImage: "gearshape.fill")
+                    }
+            }
+            .tint(themeManager.accentColor)
+            .preferredColorScheme(themeManager.colorScheme)
+
+            FloatingAIButton(showAssistant: $showAssistant)
         }
-        .tint(themeManager.accentColor)
-        .preferredColorScheme(themeManager.colorScheme)
+        .fullScreenCover(isPresented: $showAssistant) {
+            AssistantView()
+        }
     }
 }
 
@@ -44,4 +52,6 @@ struct ContentView: View {
     ContentView()
         .modelContainer(for: Assignment.self, inMemory: true)
         .environmentObject(ThemeManager())
+        .environmentObject(PointsManager())
+        .environmentObject(FocusTimerBridge())
 }

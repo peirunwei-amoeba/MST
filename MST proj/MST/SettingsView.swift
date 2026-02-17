@@ -67,6 +67,33 @@ struct SettingsView: View {
                     }
                 }
 
+                // AI Assistant Section
+                Section("AI Assistant") {
+                    HStack {
+                        Label("Assistant Name", systemImage: "sparkles")
+                        Spacer()
+                        TextField("Name", text: Binding(
+                            get: { themeManager.assistantName },
+                            set: { themeManager.assistantName = $0 }
+                        ))
+                        .multilineTextAlignment(.trailing)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 120)
+                    }
+
+                    HStack {
+                        Label("Your Name", systemImage: "person.fill")
+                        Spacer()
+                        TextField("Name", text: Binding(
+                            get: { themeManager.userName },
+                            set: { themeManager.userName = $0 }
+                        ))
+                        .multilineTextAlignment(.trailing)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 120)
+                    }
+                }
+
                 // About Section
                 Section("About") {
                     Button {
