@@ -39,6 +39,7 @@ struct CreateProjectTool: Tool {
     var tracker: ToolCallTracker
 
     func call(arguments: Arguments) async throws -> String {
+        tracker.startCall(name: name)
         let parsedDeadline = parseDate(arguments.deadline)
 
         let project = Project(

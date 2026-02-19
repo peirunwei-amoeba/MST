@@ -13,6 +13,7 @@
 //
 
 import Foundation
+import CoreLocation
 
 enum MessageRole {
     case user
@@ -23,9 +24,33 @@ struct ToolResultInfo: Identifiable {
     let id = UUID()
     let toolName: String
     let icon: String
-    let label: String
+    var label: String
     var resultText: String?
     var isExecuting: Bool
+    // Rich data for specialized card rendering
+    var coordinate: CLLocationCoordinate2D?
+    var locationName: String?
+    var calendarDate: Date?
+
+    init(
+        toolName: String,
+        icon: String,
+        label: String,
+        resultText: String? = nil,
+        isExecuting: Bool = false,
+        coordinate: CLLocationCoordinate2D? = nil,
+        locationName: String? = nil,
+        calendarDate: Date? = nil
+    ) {
+        self.toolName = toolName
+        self.icon = icon
+        self.label = label
+        self.resultText = resultText
+        self.isExecuting = isExecuting
+        self.coordinate = coordinate
+        self.locationName = locationName
+        self.calendarDate = calendarDate
+    }
 }
 
 struct AssistantMessage: Identifiable {
@@ -34,11 +59,13 @@ struct AssistantMessage: Identifiable {
     var content: String
     let timestamp: Date
     var toolResults: [ToolResultInfo]
+    var isStreaming: Bool
 
-    init(role: MessageRole, content: String, toolResults: [ToolResultInfo] = []) {
+    init(role: MessageRole, content: String, toolResults: [ToolResultInfo] = [], isStreaming: Bool = false) {
         self.role = role
         self.content = content
         self.timestamp = Date()
         self.toolResults = toolResults
+        self.isStreaming = isStreaming
     }
 }

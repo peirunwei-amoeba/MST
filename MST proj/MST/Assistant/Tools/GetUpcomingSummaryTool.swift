@@ -27,6 +27,7 @@ struct GetUpcomingSummaryTool: Tool {
     var tracker: ToolCallTracker
 
     func call(arguments: Arguments) async throws -> String {
+        tracker.startCall(name: name)
         var sections: [String] = []
 
         let assignmentDescriptor = FetchDescriptor<Assignment>(sortBy: [SortDescriptor(\.dueDate)])

@@ -30,6 +30,7 @@ struct GetAssignmentsTool: Tool {
     var tracker: ToolCallTracker
 
     func call(arguments: Arguments) async throws -> String {
+        tracker.startCall(name: name)
         let descriptor = FetchDescriptor<Assignment>(sortBy: [SortDescriptor(\.dueDate)])
         let assignments = (try? modelContext.fetch(descriptor)) ?? []
 

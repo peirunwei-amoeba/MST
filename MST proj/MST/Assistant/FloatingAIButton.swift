@@ -37,7 +37,9 @@ struct FloatingAIButton: View {
                     }
                     .buttonStyle(GlassButtonStyle())
                     .padding(.trailing, 20)
-                    .padding(.bottom, 90)
+                    // Aligned to match the Focus tab Start button vertical center:
+                    // Tab bar ≈83 pt + controlButtons.padding(.bottom, 32) + half button height
+                    .padding(.bottom, 115)
                 }
             }
         }

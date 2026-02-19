@@ -26,19 +26,13 @@ struct GetLocationTool: Tool {
     var tracker: ToolCallTracker
 
     func call(arguments: Arguments) async throws -> String {
-        let locationManager = CLLocationManager()
-        locationManager.requestWhenInUseAuthorization()
-
-        guard let location = locationManager.location else {
-            let result = "Unable to get current location. Please ensure location services are enabled."
-            tracker.record(name: name, result: result)
-            return result
-        }
-
-        let geocoder = CLGeocoder()
+        tracker.startCall(name: name)
         do {
-            let placemarks = try await geocoder.reverseGeocodeLocation(location)
-            if let placemark = placemarks.first {
+            let location = try await LocationService.shared.getCurrentLocation()
+            let geocoder = CLGeocoder()
+            let placemarks = try? await geocoder.reverseGeocodeLocation(location)
+
+            if let placemark = placemarks?.first {
                 let city = placemark.locality ?? "Unknown city"
                 let state = placemark.administrativeArea ?? ""
                 let country = placemark.country ?? ""
@@ -48,14 +42,16 @@ struct GetLocationTool: Tool {
                 tracker.record(name: name, result: result)
                 return result
             }
-        } catch {
-            // Fall back to coordinates only
-        }
 
-        let lat = String(format: "%.4f", location.coordinate.latitude)
-        let lon = String(format: "%.4f", location.coordinate.longitude)
-        let result = "Coordinates: \(lat), \(lon)"
-        tracker.record(name: name, result: result)
-        return result
+            let lat = String(format: "%.4f", location.coordinate.latitude)
+            let lon = String(format: "%.4f", location.coordinate.longitude)
+            let result = "Coordinates: (\(lat), \(lon))"
+            tracker.record(name: name, result: result)
+            return result
+        } catch {
+            let result = "Location unavailable: \(error.localizedDescription)"
+            tracker.record(name: name, result: result)
+            return result
+        }
     }
 }

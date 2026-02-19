@@ -39,6 +39,7 @@ struct CreateAssignmentTool: Tool {
     var tracker: ToolCallTracker
 
     func call(arguments: Arguments) async throws -> String {
+        tracker.startCall(name: name)
         let parsedDate = parseDate(arguments.dueDate)
         let priority = Priority(rawValue: arguments.priority ?? "Default") ?? .none
 

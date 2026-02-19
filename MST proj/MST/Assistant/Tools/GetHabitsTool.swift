@@ -30,6 +30,7 @@ struct GetHabitsTool: Tool {
     var tracker: ToolCallTracker
 
     func call(arguments: Arguments) async throws -> String {
+        tracker.startCall(name: name)
         let descriptor = FetchDescriptor<Habit>(sortBy: [SortDescriptor(\.createdDate)])
         let habits = (try? modelContext.fetch(descriptor)) ?? []
 

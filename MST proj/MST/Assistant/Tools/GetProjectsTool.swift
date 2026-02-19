@@ -30,6 +30,7 @@ struct GetProjectsTool: Tool {
     var tracker: ToolCallTracker
 
     func call(arguments: Arguments) async throws -> String {
+        tracker.startCall(name: name)
         let descriptor = FetchDescriptor<Project>(sortBy: [SortDescriptor(\.deadline)])
         let projects = (try? modelContext.fetch(descriptor)) ?? []
 

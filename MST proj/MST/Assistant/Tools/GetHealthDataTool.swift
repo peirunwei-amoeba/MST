@@ -26,6 +26,7 @@ struct GetHealthDataTool: Tool {
     var tracker: ToolCallTracker
 
     func call(arguments: Arguments) async throws -> String {
+        tracker.startCall(name: name)
         guard HKHealthStore.isHealthDataAvailable() else {
             let result = "HealthKit is not available on this device."
             tracker.record(name: name, result: result)

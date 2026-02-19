@@ -14,29 +14,35 @@
 
 import SwiftUI
 import SwiftData
+import CoreLocation
 import FoundationModels
 
-// Thread-safe tracker for tool call activity
+// Thread-safe tracker for tool call activity with real-time callbacks
 final class ToolCallTracker: @unchecked Sendable {
     private let lock = NSLock()
     private var _calls: [(name: String, result: String)] = []
 
+    // Callbacks set on MainActor before session.respond(); called via DispatchQueue.main
+    var onCallStarted: ((String) -> Void)?
+    var onCallCompleted: ((String, String) -> Void)?
+
     var calls: [(name: String, result: String)] {
-        lock.lock()
-        defer { lock.unlock() }
-        return _calls
+        lock.withLock { _calls }
+    }
+
+    func startCall(name: String) {
+        let cb = onCallStarted
+        DispatchQueue.main.async { cb?(name) }
     }
 
     func record(name: String, result: String) {
-        lock.lock()
-        _calls.append((name, result))
-        lock.unlock()
+        lock.withLock { _calls.append((name, result)) }
+        let cb = onCallCompleted
+        DispatchQueue.main.async { cb?(name, result) }
     }
 
     func clear() {
-        lock.lock()
-        _calls.removeAll()
-        lock.unlock()
+        lock.withLock { _calls.removeAll() }
     }
 }
 
@@ -51,8 +57,9 @@ final class AssistantViewModel {
     private let pointsManager: PointsManager
     private let focusTimerBridge: FocusTimerBridge
     private let themeManager: ThemeManager
-    private let tracker = ToolCallTracker()
+    let tracker = ToolCallTracker()
     private var messageCount = 0
+    private var streamingTask: Task<Void, Never>?
 
     var isAvailable: Bool {
         SystemLanguageModel.default.availability == .available
@@ -72,15 +79,16 @@ final class AssistantViewModel {
         return """
         You are \(agentName), a friendly and concise productivity assistant for \(userName) in the MST app. \
         You help manage assignments, projects, and habits. \
-        Keep responses short (2-3 sentences max unless listing items). \
+        Keep responses concise and structured — use short bullet lists for multiple items. \
         Use the available tools to read and modify the user's data. \
         When the user asks about their tasks, assignments, or what's due, use the appropriate tool. \
+        IMPORTANT: Before creating or editing any assignment, project, or habit, ALWAYS call getCurrentDate first to know the current date and time. \
         When asked to create or complete items, use the write tools. \
         Always confirm actions taken. Be encouraging about streaks and progress. \
         If the user asks about weather, location, or health, use those tools. \
         For focus timer requests, use the startFocusTimer tool. \
-        Today's date can be fetched with getCurrentDate. \
-        Do not make up data — always use tools to get real information.
+        Do not make up data — always use tools to get real information. \
+        Format responses with markdown: **bold** for key points, bullet lists for multiple items.
         """
     }
 
@@ -119,10 +127,7 @@ final class AssistantViewModel {
         tracker.clear()
         messageCount += 1
 
-        // Recreate session if context is getting long
-        if messageCount > 8 {
-            createSession()
-        }
+        if messageCount > 8 { createSession() }
 
         guard let session else {
             messages.append(AssistantMessage(role: .assistant, content: "Apple Intelligence is not available on this device."))
@@ -130,34 +135,81 @@ final class AssistantViewModel {
             return
         }
 
+        // Add streaming placeholder message
+        let streamingMsg = AssistantMessage(role: .assistant, content: "", isStreaming: true)
+        messages.append(streamingMsg)
+        let msgId = streamingMsg.id
+
+        // Wire up real-time tool card callbacks
+        tracker.onCallStarted = { [weak self] name in
+            guard let self else { return }
+            let info = self.toolInfoFor(name)
+            let card = ToolResultInfo(
+                toolName: name,
+                icon: info.icon,
+                label: info.label,
+                resultText: nil,
+                isExecuting: true
+            )
+            if let idx = self.messages.firstIndex(where: { $0.id == msgId }) {
+                self.messages[idx].toolResults.append(card)
+            }
+        }
+
+        tracker.onCallCompleted = { [weak self] name, result in
+            guard let self,
+                  let msgIdx = self.messages.firstIndex(where: { $0.id == msgId }),
+                  let cardIdx = self.messages[msgIdx].toolResults.firstIndex(where: { $0.toolName == name && $0.isExecuting })
+            else { return }
+
+            self.messages[msgIdx].toolResults[cardIdx].isExecuting = false
+            self.messages[msgIdx].toolResults[cardIdx].resultText = result
+            self.messages[msgIdx].toolResults[cardIdx].label = self.toolInfoFor(name).label
+
+            // Enrich location cards with map data
+            if name == "getLocation" {
+                if let (coord, placeName) = self.parseCoordinates(from: result) {
+                    self.messages[msgIdx].toolResults[cardIdx].coordinate = coord
+                    self.messages[msgIdx].toolResults[cardIdx].locationName = placeName
+                }
+            }
+            // Enrich date cards
+            if name == "getCurrentDate" {
+                self.messages[msgIdx].toolResults[cardIdx].calendarDate = Date()
+            }
+        }
+
         do {
             let response = try await session.respond(to: trimmed)
 
-            // Build tool result cards from tracker
-            let toolResults = tracker.calls.map { call in
-                let info = toolInfoFor(call.name)
-                return ToolResultInfo(
-                    toolName: call.name,
-                    icon: info.icon,
-                    label: info.label,
-                    resultText: call.result,
-                    isExecuting: false
-                )
+            // Animate text word-by-word for streaming feel
+            if let msgIdx = messages.firstIndex(where: { $0.id == msgId }) {
+                await streamText(response.content, into: msgIdx)
+                messages[msgIdx].isStreaming = false
             }
-
-            messages.append(AssistantMessage(
-                role: .assistant,
-                content: response.content,
-                toolResults: toolResults
-            ))
         } catch {
-            messages.append(AssistantMessage(
-                role: .assistant,
-                content: "Sorry, I encountered an error. Please try again."
-            ))
+            if let msgIdx = messages.firstIndex(where: { $0.id == msgId }) {
+                messages[msgIdx].content = "Sorry, I ran into an issue. Please try again."
+                messages[msgIdx].isStreaming = false
+            }
         }
 
+        tracker.onCallStarted = nil
+        tracker.onCallCompleted = nil
         isGenerating = false
+    }
+
+    private func streamText(_ text: String, into idx: Int) async {
+        let words = text.components(separatedBy: " ")
+        var accumulated = ""
+        // Speed: fast for long responses, slower for short
+        let delay: UInt64 = words.count > 120 ? 8_000_000 : (words.count > 50 ? 15_000_000 : 22_000_000)
+        for word in words {
+            guard !Task.isCancelled else { break }
+            accumulated += (accumulated.isEmpty ? "" : " ") + word
+            messages[idx].content = accumulated
+            try? await Task.sleep(nanoseconds: delay)
+        }
     }
 
     func clearConversation() {
@@ -165,7 +217,25 @@ final class AssistantViewModel {
         createSession()
     }
 
-    private func toolInfoFor(_ name: String) -> (icon: String, label: String) {
+    // MARK: - Coordinate parsing
+
+    private func parseCoordinates(from result: String) -> (CLLocationCoordinate2D, String?)? {
+        guard let openParen = result.lastIndex(of: "("),
+              let closeParen = result.lastIndex(of: ")") else { return nil }
+        let inner = result[result.index(after: openParen)..<closeParen]
+        let parts = inner.split(separator: ",")
+        guard parts.count == 2,
+              let lat = Double(parts[0].trimmingCharacters(in: .whitespaces)),
+              let lon = Double(parts[1].trimmingCharacters(in: .whitespaces))
+        else { return nil }
+        let name = result.components(separatedBy: "(").first?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return (CLLocationCoordinate2D(latitude: lat, longitude: lon), name)
+    }
+
+    // MARK: - Tool metadata
+
+    func toolInfoFor(_ name: String) -> (icon: String, label: String) {
         switch name {
         case "getAssignments":
             return ("book.fill", "Fetched assignments")
@@ -174,7 +244,7 @@ final class AssistantViewModel {
         case "getHabits":
             return ("flame.fill", "Fetched habits")
         case "getUpcomingSummary":
-            return ("list.bullet.clipboard", "Got summary")
+            return ("list.bullet.clipboard.fill", "Got summary")
         case "createAssignment":
             return ("plus.circle.fill", "Created assignment")
         case "createProject":
@@ -186,7 +256,7 @@ final class AssistantViewModel {
         case "startFocusTimer":
             return ("timer", "Set focus timer")
         case "getCurrentDate":
-            return ("calendar", "Got date")
+            return ("calendar", "Got date & time")
         case "getWeather":
             return ("cloud.sun.fill", "Fetched weather")
         case "getLocation":
