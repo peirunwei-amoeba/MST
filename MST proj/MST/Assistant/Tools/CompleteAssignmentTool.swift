@@ -30,7 +30,7 @@ struct CompleteAssignmentTool: Tool {
     var pointsManager: PointsManager
     var tracker: ToolCallTracker
 
-    func call(arguments: Arguments) async throws -> ToolOutput {
+    func call(arguments: Arguments) async throws -> String {
         let descriptor = FetchDescriptor<Assignment>(sortBy: [SortDescriptor(\.dueDate)])
         let assignments = (try? modelContext.fetch(descriptor)) ?? []
 
@@ -40,7 +40,7 @@ struct CompleteAssignmentTool: Tool {
         }) else {
             let result = "No incomplete assignment found matching '\(arguments.title)'."
             tracker.record(name: name, result: result)
-            return ToolOutput(result)
+            return result
         }
 
         match.toggleCompletion()
@@ -49,6 +49,6 @@ struct CompleteAssignmentTool: Tool {
 
         let result = "Completed '\(match.title)'. +1 point!"
         tracker.record(name: name, result: result)
-        return ToolOutput(result)
+        return result
     }
 }

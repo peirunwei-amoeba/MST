@@ -29,7 +29,7 @@ struct GetAssignmentsTool: Tool {
     var modelContext: ModelContext
     var tracker: ToolCallTracker
 
-    func call(arguments: Arguments) async throws -> ToolOutput {
+    func call(arguments: Arguments) async throws -> String {
         let descriptor = FetchDescriptor<Assignment>(sortBy: [SortDescriptor(\.dueDate)])
         let assignments = (try? modelContext.fetch(descriptor)) ?? []
 
@@ -49,7 +49,7 @@ struct GetAssignmentsTool: Tool {
         if filtered.isEmpty {
             let result = "No assignments found for filter '\(filter)'."
             tracker.record(name: name, result: result)
-            return ToolOutput(result)
+            return result
         }
 
         let lines = filtered.prefix(10).map { a in
@@ -63,7 +63,7 @@ struct GetAssignmentsTool: Tool {
             result += "\n...and \(filtered.count - 10) more"
         }
         tracker.record(name: name, result: "\(filtered.count) assignment(s) found")
-        return ToolOutput(result)
+        return result
     }
 }
 

@@ -28,7 +28,7 @@ struct StartFocusTimerTool: Tool {
     var focusTimerBridge: FocusTimerBridge
     var tracker: ToolCallTracker
 
-    func call(arguments: Arguments) async throws -> ToolOutput {
+    func call(arguments: Arguments) async throws -> String {
         let minutes = max(1, min(239, arguments.minutes))
         await MainActor.run {
             focusTimerBridge.requestedMinutes = minutes
@@ -36,7 +36,7 @@ struct StartFocusTimerTool: Tool {
         }
         let result = "Focus timer set to \(minutes) minutes and starting now. You can manage it on the Focus tab."
         tracker.record(name: name, result: result)
-        return ToolOutput(result)
+        return result
     }
 }
 

@@ -26,7 +26,7 @@ struct GetUpcomingSummaryTool: Tool {
     var modelContext: ModelContext
     var tracker: ToolCallTracker
 
-    func call(arguments: Arguments) async throws -> ToolOutput {
+    func call(arguments: Arguments) async throws -> String {
         var sections: [String] = []
 
         let assignmentDescriptor = FetchDescriptor<Assignment>(sortBy: [SortDescriptor(\.dueDate)])
@@ -81,6 +81,6 @@ struct GetUpcomingSummaryTool: Tool {
         }
 
         tracker.record(name: name, result: "Summary generated")
-        return ToolOutput(result)
+        return result
     }
 }

@@ -25,14 +25,14 @@ struct GetLocationTool: Tool {
 
     var tracker: ToolCallTracker
 
-    func call(arguments: Arguments) async throws -> ToolOutput {
+    func call(arguments: Arguments) async throws -> String {
         let locationManager = CLLocationManager()
         locationManager.requestWhenInUseAuthorization()
 
         guard let location = locationManager.location else {
             let result = "Unable to get current location. Please ensure location services are enabled."
             tracker.record(name: name, result: result)
-            return ToolOutput(result)
+            return result
         }
 
         let geocoder = CLGeocoder()
@@ -46,7 +46,7 @@ struct GetLocationTool: Tool {
                 let lon = String(format: "%.4f", location.coordinate.longitude)
                 let result = "\(city), \(state), \(country) (\(lat), \(lon))"
                 tracker.record(name: name, result: result)
-                return ToolOutput(result)
+                return result
             }
         } catch {
             // Fall back to coordinates only
@@ -56,6 +56,6 @@ struct GetLocationTool: Tool {
         let lon = String(format: "%.4f", location.coordinate.longitude)
         let result = "Coordinates: \(lat), \(lon)"
         tracker.record(name: name, result: result)
-        return ToolOutput(result)
+        return result
     }
 }

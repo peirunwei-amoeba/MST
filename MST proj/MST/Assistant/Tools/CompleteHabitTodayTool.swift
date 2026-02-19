@@ -30,7 +30,7 @@ struct CompleteHabitTodayTool: Tool {
     var pointsManager: PointsManager
     var tracker: ToolCallTracker
 
-    func call(arguments: Arguments) async throws -> ToolOutput {
+    func call(arguments: Arguments) async throws -> String {
         let descriptor = FetchDescriptor<Habit>(sortBy: [SortDescriptor(\.createdDate)])
         let habits = (try? modelContext.fetch(descriptor)) ?? []
 
@@ -40,13 +40,13 @@ struct CompleteHabitTodayTool: Tool {
         }) else {
             let result = "No active habit found matching '\(arguments.title)'."
             tracker.record(name: name, result: result)
-            return ToolOutput(result)
+            return result
         }
 
         if match.isCompletedToday {
             let result = "'\(match.title)' is already completed for today."
             tracker.record(name: name, result: result)
-            return ToolOutput(result)
+            return result
         }
 
         match.completeToday()
@@ -56,6 +56,6 @@ struct CompleteHabitTodayTool: Tool {
         let streak = match.currentStreak
         let result = "Completed '\(match.title)' for today! Streak: \(streak) days. +1 point!"
         tracker.record(name: name, result: result)
-        return ToolOutput(result)
+        return result
     }
 }

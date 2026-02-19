@@ -38,7 +38,7 @@ struct CreateProjectTool: Tool {
     var modelContext: ModelContext
     var tracker: ToolCallTracker
 
-    func call(arguments: Arguments) async throws -> ToolOutput {
+    func call(arguments: Arguments) async throws -> String {
         let parsedDeadline = parseDate(arguments.deadline)
 
         let project = Project(
@@ -73,7 +73,7 @@ struct CreateProjectTool: Tool {
         let goalText = goalCount > 0 ? " with \(goalCount) goals" : ""
         let result = "Created project '\(arguments.title)'\(goalText), deadline \(formatter.string(from: parsedDeadline))"
         tracker.record(name: name, result: result)
-        return ToolOutput(result)
+        return result
     }
 
     private func parseDate(_ string: String) -> Date {

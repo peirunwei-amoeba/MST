@@ -14,8 +14,8 @@
 
 import SwiftUI
 
-@MainActor
-@Observable final class FocusTimerBridge: ObservableObject {
+@Observable @MainActor
+final class FocusTimerBridge {
     var requestedMinutes: Int? = nil
     var shouldAutoStart: Bool = false
 }

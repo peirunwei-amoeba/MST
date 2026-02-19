@@ -18,7 +18,7 @@ import SwiftData
 struct AssistantView: View {
     @EnvironmentObject private var themeManager: ThemeManager
     @EnvironmentObject private var pointsManager: PointsManager
-    @EnvironmentObject private var focusTimerBridge: FocusTimerBridge
+    @Environment(FocusTimerBridge.self) private var focusTimerBridge
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 

@@ -29,7 +29,7 @@ struct GetHabitsTool: Tool {
     var modelContext: ModelContext
     var tracker: ToolCallTracker
 
-    func call(arguments: Arguments) async throws -> ToolOutput {
+    func call(arguments: Arguments) async throws -> String {
         let descriptor = FetchDescriptor<Habit>(sortBy: [SortDescriptor(\.createdDate)])
         let habits = (try? modelContext.fetch(descriptor)) ?? []
 
@@ -47,7 +47,7 @@ struct GetHabitsTool: Tool {
         if filtered.isEmpty {
             let result = "No habits found for filter '\(filter)'."
             tracker.record(name: name, result: result)
-            return ToolOutput(result)
+            return result
         }
 
         let lines = filtered.prefix(10).map { h in
@@ -60,6 +60,6 @@ struct GetHabitsTool: Tool {
             result += "\n...and \(filtered.count - 10) more"
         }
         tracker.record(name: name, result: "\(filtered.count) habit(s) found")
-        return ToolOutput(result)
+        return result
     }
 }

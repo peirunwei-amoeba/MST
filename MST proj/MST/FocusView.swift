@@ -107,7 +107,7 @@ struct FocusView: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var themeManager: ThemeManager
     @EnvironmentObject private var pointsManager: PointsManager
-    @EnvironmentObject private var focusTimerBridge: FocusTimerBridge
+    @Environment(FocusTimerBridge.self) private var focusTimerBridge
 
     // Data queries
     @Query(filter: #Predicate<Assignment> { !$0.isCompleted })
@@ -610,5 +610,5 @@ struct FocusView: View {
     .modelContainer(for: [Assignment.self, Project.self, Goal.self, Habit.self, HabitEntry.self, PointsLedger.self, PointsTransaction.self], inMemory: true)
     .environmentObject(ThemeManager())
     .environmentObject(PointsManager())
-    .environmentObject(FocusTimerBridge())
+    .environment(FocusTimerBridge())
 }

@@ -53,5 +53,5 @@ struct ContentView: View {
         .modelContainer(for: Assignment.self, inMemory: true)
         .environmentObject(ThemeManager())
         .environmentObject(PointsManager())
-        .environmentObject(FocusTimerBridge())
+        .environment(FocusTimerBridge())
 }

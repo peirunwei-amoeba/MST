@@ -38,7 +38,7 @@ struct CreateAssignmentTool: Tool {
     var modelContext: ModelContext
     var tracker: ToolCallTracker
 
-    func call(arguments: Arguments) async throws -> ToolOutput {
+    func call(arguments: Arguments) async throws -> String {
         let parsedDate = parseDate(arguments.dueDate)
         let priority = Priority(rawValue: arguments.priority ?? "Default") ?? .none
 
@@ -56,7 +56,7 @@ struct CreateAssignmentTool: Tool {
         formatter.timeStyle = .short
         let result = "Created '\(arguments.title)' due \(formatter.string(from: parsedDate)) (\(priority.rawValue))"
         tracker.record(name: name, result: result)
-        return ToolOutput(result)
+        return result
     }
 
     private func parseDate(_ string: String) -> Date {

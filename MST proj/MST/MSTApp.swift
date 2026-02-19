@@ -19,14 +19,14 @@ import SwiftData
 struct MSTApp: App {
     @StateObject private var themeManager = ThemeManager()
     @StateObject private var pointsManager = PointsManager()
-    @StateObject private var focusTimerBridge = FocusTimerBridge()
+    @State private var focusTimerBridge = FocusTimerBridge()
 
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environmentObject(themeManager)
                 .environmentObject(pointsManager)
-                .environmentObject(focusTimerBridge)
+                .environment(focusTimerBridge)
                 .onAppear {
                     HabitReminderManager.requestNotificationPermission()
                 }

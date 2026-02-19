@@ -29,7 +29,7 @@ struct GetProjectsTool: Tool {
     var modelContext: ModelContext
     var tracker: ToolCallTracker
 
-    func call(arguments: Arguments) async throws -> ToolOutput {
+    func call(arguments: Arguments) async throws -> String {
         let descriptor = FetchDescriptor<Project>(sortBy: [SortDescriptor(\.deadline)])
         let projects = (try? modelContext.fetch(descriptor)) ?? []
 
@@ -45,7 +45,7 @@ struct GetProjectsTool: Tool {
         if filtered.isEmpty {
             let result = "No projects found for filter '\(filter)'."
             tracker.record(name: name, result: result)
-            return ToolOutput(result)
+            return result
         }
 
         let lines = filtered.prefix(10).map { p in
@@ -60,6 +60,6 @@ struct GetProjectsTool: Tool {
             result += "\n...and \(filtered.count - 10) more"
         }
         tracker.record(name: name, result: "\(filtered.count) project(s) found")
-        return ToolOutput(result)
+        return result
     }
 }

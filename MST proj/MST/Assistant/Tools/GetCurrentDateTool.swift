@@ -24,7 +24,7 @@ struct GetCurrentDateTool: Tool {
 
     var tracker: ToolCallTracker
 
-    func call(arguments: Arguments) async throws -> ToolOutput {
+    func call(arguments: Arguments) async throws -> String {
         let now = Date()
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "EEEE, MMMM d, yyyy"
@@ -36,6 +36,6 @@ struct GetCurrentDateTool: Tool {
 
         let result = "\(dateString) at \(timeString)"
         tracker.record(name: name, result: result)
-        return ToolOutput(result)
+        return result
     }
 }

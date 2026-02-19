@@ -26,7 +26,7 @@ struct GetWeatherTool: Tool {
 
     var tracker: ToolCallTracker
 
-    func call(arguments: Arguments) async throws -> ToolOutput {
+    func call(arguments: Arguments) async throws -> String {
         do {
             let locationManager = CLLocationManager()
             locationManager.requestWhenInUseAuthorization()
@@ -34,7 +34,7 @@ struct GetWeatherTool: Tool {
             guard let location = locationManager.location else {
                 let result = "Unable to get current location. Please ensure location services are enabled."
                 tracker.record(name: name, result: result)
-                return ToolOutput(result)
+                return result
             }
 
             let weather = try await WeatherService.shared.weather(for: location)
@@ -54,11 +54,11 @@ struct GetWeatherTool: Tool {
             result += ", Humidity: \(humidity)%"
 
             tracker.record(name: name, result: result)
-            return ToolOutput(result)
+            return result
         } catch {
             let result = "Weather data unavailable: \(error.localizedDescription)"
             tracker.record(name: name, result: result)
-            return ToolOutput(result)
+            return result
         }
     }
 }

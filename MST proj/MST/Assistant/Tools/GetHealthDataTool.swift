@@ -25,11 +25,11 @@ struct GetHealthDataTool: Tool {
 
     var tracker: ToolCallTracker
 
-    func call(arguments: Arguments) async throws -> ToolOutput {
+    func call(arguments: Arguments) async throws -> String {
         guard HKHealthStore.isHealthDataAvailable() else {
             let result = "HealthKit is not available on this device."
             tracker.record(name: name, result: result)
-            return ToolOutput(result)
+            return result
         }
 
         let store = HKHealthStore()
@@ -44,7 +44,7 @@ struct GetHealthDataTool: Tool {
         } catch {
             let result = "Health data access not authorized."
             tracker.record(name: name, result: result)
-            return ToolOutput(result)
+            return result
         }
 
         var parts: [String] = []
@@ -73,7 +73,7 @@ struct GetHealthDataTool: Tool {
         }
 
         tracker.record(name: name, result: result)
-        return ToolOutput(result)
+        return result
     }
 
     private func queryTodaySum(store: HKHealthStore, type: HKQuantityType, unit: HKUnit) async -> Double? {
