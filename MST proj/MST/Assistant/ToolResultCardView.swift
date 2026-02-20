@@ -125,8 +125,6 @@ struct ToolResultCardView: View {
             calendarCard(date: date)
         } else if toolResult.toolName == "getWeather", let text = toolResult.resultText, !text.isEmpty {
             weatherCard(text: text)
-        } else if toolResult.toolName == "getHealthData", let text = toolResult.resultText, !text.isEmpty {
-            healthCard(text: text)
         } else if let text = toolResult.resultText, !text.isEmpty {
             Text(text)
                 .font(.caption)
@@ -164,36 +162,6 @@ struct ToolResultCardView: View {
         if lower.contains("partly") || lower.contains("scattered") { return "cloud.sun.fill" }
         if lower.contains("cloud") || lower.contains("overcast") { return "cloud.fill" }
         return "thermometer.medium"
-    }
-
-    // MARK: Health card
-
-    @ViewBuilder
-    private func healthCard(text: String) -> some View {
-        let stats = text.components(separatedBy: "|")
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }
-        VStack(alignment: .leading, spacing: 6) {
-            ForEach(stats, id: \.self) { stat in
-                HStack(spacing: 8) {
-                    Image(systemName: healthSymbol(for: stat))
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(themeManager.accentColor)
-                        .frame(width: 16)
-                    Text(stat)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-    }
-
-    private func healthSymbol(for stat: String) -> String {
-        let lower = stat.lowercased()
-        if lower.contains("step") { return "figure.walk" }
-        if lower.contains("heart") { return "heart.fill" }
-        if lower.contains("cal") || lower.contains("energy") { return "flame.fill" }
-        return "cross.fill"
     }
 
     // MARK: Location card with embedded map

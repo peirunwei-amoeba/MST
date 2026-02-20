@@ -15,6 +15,7 @@
 import SwiftUI
 import SwiftData
 import AVFoundation
+import FoundationModels
 
 // MARK: - Glass Button Style
 
@@ -39,6 +40,12 @@ struct HomeView: View {
     @State private var selectedAssignment: Assignment?
     @State private var showingAllAssignments = false
     @State private var recentlyCompletedIds: Set<UUID> = []
+
+    // AI-generated navigation title
+    @State private var aiNavTitle: String = ""
+    @State private var aiNavSubtitle: String = ""
+    @State private var isGeneratingTitle: Bool = false
+    @State private var titleGenerationTask: Task<Void, Never>?
 
     // Project-related state
     @State private var showingAddProjectSheet = false
@@ -86,7 +93,47 @@ struct HomeView: View {
                 }
             }
             .background(themeManager.backgroundColor)
-            .navigationTitle("Welcome")
+            .navigationTitle(aiNavTitle.isEmpty ? "Welcome" : aiNavTitle)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    VStack(spacing: 1) {
+                        if aiNavTitle.isEmpty && isGeneratingTitle {
+                            // Loading dots while title generates
+                            HStack(spacing: 5) {
+                                ForEach(0..<3, id: \.self) { i in
+                                    Circle()
+                                        .fill(Color.secondary.opacity(0.5))
+                                        .frame(width: 5, height: 5)
+                                        .scaleEffect(isGeneratingTitle ? 1.2 : 0.8)
+                                        .animation(.easeInOut(duration: 0.5).repeatForever().delay(Double(i) * 0.15), value: isGeneratingTitle)
+                                }
+                            }
+                        } else {
+                            Text(aiNavTitle.isEmpty ? "Welcome" : aiNavTitle)
+                                .font(.headline.weight(.bold))
+                                .lineLimit(1)
+                                .transition(.opacity)
+                        }
+                        if !aiNavSubtitle.isEmpty {
+                            Text(aiNavSubtitle)
+                                .font(.system(size: 10))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .transition(.opacity.combined(with: .move(edge: .top)))
+                        }
+                    }
+                    .animation(.easeInOut(duration: 0.3), value: aiNavTitle)
+                    .animation(.easeInOut(duration: 0.3), value: aiNavSubtitle)
+                }
+            }
+            .onAppear {
+                if aiNavTitle.isEmpty && !isGeneratingTitle {
+                    generateAITitle()
+                }
+            }
+            .onDisappear {
+                titleGenerationTask?.cancel()
+            }
             .sheet(isPresented: $showingAddSheet) {
                 AddAssignmentView()
             }
@@ -733,6 +780,84 @@ struct HomeView: View {
                 withAnimation(.easeOut(duration: 0.4)) {
                     _ = recentlyCompletedProjectIds.remove(project.id)
                 }
+            }
+        }
+    }
+
+    // MARK: - AI Navigation Title Generation
+
+    private func generateAITitle() {
+        guard SystemLanguageModel.default.availability == .available else {
+            aiNavTitle = "Welcome"
+            return
+        }
+
+        titleGenerationTask?.cancel()
+        isGeneratingTitle = true
+        aiNavTitle = ""
+        aiNavSubtitle = ""
+
+        let now = Date()
+        let calendar = Calendar.current
+        let hour = calendar.component(.hour, from: now)
+        let dayOfWeek = calendar.weekdaySymbols[calendar.component(.weekday, from: now) - 1]
+        let userName = themeManager.userName.isEmpty ? "" : themeManager.userName
+        let greeting = hour < 12 ? "morning" : hour < 17 ? "afternoon" : "evening"
+        let pendingCount = upcomingAssignments.count
+        let activeHabitCount = activeHabits.count
+
+        titleGenerationTask = Task {
+            do {
+                let session = LanguageModelSession()
+
+                // Generate title
+                let titlePrompt = "Generate a very short, fun, punny navigation title (4-6 words max) for a productivity app home screen. It's \(dayOfWeek) \(greeting)\(userName.isEmpty ? "" : " for \(userName)"). The user has \(pendingCount) pending task\(pendingCount == 1 ? "" : "s") and \(activeHabitCount) active habit\(activeHabitCount == 1 ? "" : "s"). Be creative, use wordplay or puns. No punctuation at the end. Examples: 'Task Force Assembled', 'Let's Crush It Today', 'Goals Loading...' Just the title, nothing else."
+                let titleResponse = try await session.respond(to: titlePrompt)
+                guard !Task.isCancelled else { return }
+
+                // Stream the title word by word
+                let titleWords = titleResponse.content.trimmingCharacters(in: .whitespacesAndNewlines).components(separatedBy: " ")
+                for (i, word) in titleWords.enumerated() {
+                    guard !Task.isCancelled else { return }
+                    await MainActor.run {
+                        withAnimation(.easeIn(duration: 0.1)) {
+                            aiNavTitle += (i == 0 ? "" : " ") + word
+                        }
+                    }
+                    try? await Task.sleep(nanoseconds: 60_000_000)
+                }
+
+                guard !Task.isCancelled else { return }
+
+                // Generate quote
+                let quotePrompt = "Give me one short inspirational quote from a famous person (real, verified quote only). Format exactly as: \"Quote text\" — Person Name. Keep it under 12 words."
+                let quoteResponse = try await session.respond(to: quotePrompt)
+                guard !Task.isCancelled else { return }
+
+                let quote = quoteResponse.content.trimmingCharacters(in: .whitespacesAndNewlines)
+
+                // Stream the quote word by word
+                let quoteWords = quote.components(separatedBy: " ")
+                var builtQuote = ""
+                for (i, word) in quoteWords.enumerated() {
+                    guard !Task.isCancelled else { return }
+                    await MainActor.run {
+                        builtQuote += (i == 0 ? "" : " ") + word
+                        withAnimation(.easeIn(duration: 0.08)) {
+                            aiNavSubtitle = builtQuote
+                        }
+                    }
+                    try? await Task.sleep(nanoseconds: 40_000_000)
+                }
+
+            } catch {
+                await MainActor.run {
+                    if aiNavTitle.isEmpty { aiNavTitle = "Welcome" }
+                }
+            }
+
+            await MainActor.run {
+                isGeneratingTitle = false
             }
         }
     }

@@ -238,6 +238,11 @@ struct FocusView: View {
                 .transition(.opacity)
             }
         }
+        .overlay {
+            PointsCapsuleView()
+                .padding(.trailing, 20)
+                .padding(.top, 60)
+        }
         .navigationTitle("Focus")
         .navigationBarTitleDisplayMode(.large)
         .sheet(isPresented: $showTaskPicker) {
@@ -577,6 +582,10 @@ struct FocusView: View {
             resetTimer()
             return
         }
+
+        // Confirmation sound and haptic for task completion
+        AudioServicesPlaySystemSound(1407)
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
 
         switch task {
         case .assignment(let assignment):

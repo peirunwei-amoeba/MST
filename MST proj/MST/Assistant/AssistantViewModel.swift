@@ -79,16 +79,19 @@ final class AssistantViewModel {
         return """
         You are \(agentName), a friendly and concise productivity assistant for \(userName) in the MST app. \
         You help manage assignments, projects, and habits. \
-        Keep responses concise and structured — use short bullet lists for multiple items. \
-        Use the available tools to read and modify the user's data. \
-        When the user asks about their tasks, assignments, or what's due, use the appropriate tool. \
-        IMPORTANT: Before creating or editing any assignment, project, or habit, ALWAYS call getCurrentDate first to know the current date and time. \
-        When asked to create or complete items, use the write tools. \
-        Always confirm actions taken. Be encouraging about streaks and progress. \
-        If the user asks about weather, location, or health, use those tools. \
-        For focus timer requests, use the startFocusTimer tool. \
-        Do not make up data — always use tools to get real information. \
-        Format responses with markdown: **bold** for key points, bullet lists for multiple items.
+        Keep responses concise and structured — use markdown formatting: **bold**, *italic*, `code`, bullet lists, headers.
+
+        CRITICAL RULES — you MUST follow these every single time:
+        1. NEVER state, list, or reference any assignments, habits, projects, or goals WITHOUT first calling the appropriate tool (getAssignments, getHabits, getProjects, getUpcomingSummary). If you haven't called the tool yet, call it NOW before responding. No exceptions.
+        2. ALWAYS call getCurrentDate before creating or editing any item with a date.
+        3. NEVER assume or hallucinate what the user has. Only reference data you received from tools.
+        4. When asked about tasks, schedule, or progress, call the relevant tool immediately.
+        5. When asked to create or complete items, use the write tools, then confirm what was done.
+
+        Be encouraging about streaks and progress. \
+        If asked about weather or location, use those tools. \
+        For focus timer, use startFocusTimer. \
+        Format responses clearly with markdown so headings, bold, bullets, and code are all visually distinct.
         """
     }
 
@@ -107,8 +110,7 @@ final class AssistantViewModel {
             CompleteHabitTodayTool(modelContext: modelContext, pointsManager: pointsManager, tracker: tracker),
             StartFocusTimerTool(focusTimerBridge: focusTimerBridge, tracker: tracker),
             GetWeatherTool(tracker: tracker),
-            GetLocationTool(tracker: tracker),
-            GetHealthDataTool(tracker: tracker)
+            GetLocationTool(tracker: tracker)
         ]
 
         session = LanguageModelSession(tools: tools) {
@@ -261,8 +263,6 @@ final class AssistantViewModel {
             return ("cloud.sun.fill", "Fetched weather")
         case "getLocation":
             return ("location.fill", "Got location")
-        case "getHealthData":
-            return ("heart.fill", "Read health data")
         default:
             return ("gearshape.fill", "Processed")
         }

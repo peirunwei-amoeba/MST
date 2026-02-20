@@ -121,7 +121,9 @@ class PointsManager: ObservableObject {
         )
 
         // Check streak milestones if habit point was awarded
+        // Save context first to ensure today's completion is reflected in the streak calculation
         if awarded {
+            try? modelContext.save()
             checkStreakMilestones(habit: habit, modelContext: modelContext)
         }
     }

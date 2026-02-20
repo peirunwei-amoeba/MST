@@ -42,8 +42,10 @@ struct ContentView: View {
 
             FloatingAIButton(showAssistant: $showAssistant)
         }
-        .fullScreenCover(isPresented: $showAssistant) {
+        .sheet(isPresented: $showAssistant) {
             AssistantView()
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
         }
     }
 }

@@ -191,7 +191,6 @@ struct AssistantView: View {
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 14)
-        .background(.ultraThinMaterial.opacity(0.6))
         .overlay(alignment: .bottom) {
             Rectangle()
                 .fill(.secondary.opacity(0.1))
@@ -251,7 +250,6 @@ struct AssistantView: View {
         .padding(.horizontal, 16)
         .padding(.top, 10)
         .padding(.bottom, max(16, safeAreaBottom))
-        .background(.ultraThinMaterial.opacity(0.7))
         .overlay(alignment: .top) {
             Rectangle()
                 .fill(.secondary.opacity(0.1))

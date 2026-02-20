@@ -23,7 +23,7 @@ struct MSTApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            AppRootView()
                 .environmentObject(themeManager)
                 .environmentObject(pointsManager)
                 .environment(focusTimerBridge)
@@ -32,5 +32,28 @@ struct MSTApp: App {
                 }
         }
         .modelContainer(for: [Assignment.self, Project.self, Goal.self, Habit.self, HabitEntry.self, PointsLedger.self, PointsTransaction.self])
+    }
+}
+
+/// Wrapper that schedules AI encouragement notifications using the SwiftData model context.
+private struct AppRootView: View {
+    @EnvironmentObject private var themeManager: ThemeManager
+    @Environment(\.modelContext) private var modelContext
+
+    var body: some View {
+        ContentView()
+            .task {
+                let lastScheduled = UserDefaults.standard.object(forKey: "lastEncouragementSchedule") as? Date
+                let shouldSchedule = lastScheduled.map { Calendar.current.isDateInToday($0) == false } ?? true
+                if shouldSchedule {
+                    UserDefaults.standard.set(Date(), forKey: "lastEncouragementSchedule")
+                    // Small delay to avoid slowing down app launch
+                    try? await Task.sleep(nanoseconds: 3_000_000_000)
+                    await AIEncouragementManager.scheduleEncouragements(
+                        modelContext: modelContext,
+                        userName: themeManager.userName
+                    )
+                }
+            }
     }
 }
