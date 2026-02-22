@@ -25,77 +25,146 @@ struct AssistantView: View {
 
     @State private var viewModel: AssistantViewModel?
     @State private var showOnboarding = false
+    @State private var showIconPicker = false
     @FocusState private var inputFocused: Bool
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            // Full-screen glass background
-            Rectangle()
-                .fill(.ultraThinMaterial)
+        NavigationStack {
+            ZStack(alignment: .bottom) {
+                // Full-screen glass background
+                Rectangle()
+                    .fill(.ultraThinMaterial)
+                    .ignoresSafeArea()
+
+                // Subtle accent gradient behind the glass
+                LinearGradient(
+                    colors: [
+                        themeManager.accentColor.opacity(0.06),
+                        themeManager.accentColor.opacity(0.02),
+                        Color.clear
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
                 .ignoresSafeArea()
+                .allowsHitTesting(false)
 
-            // Subtle accent gradient behind the glass
-            LinearGradient(
-                colors: [
-                    themeManager.accentColor.opacity(0.06),
-                    themeManager.accentColor.opacity(0.02),
-                    Color.clear
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
-            .allowsHitTesting(false)
+                VStack(spacing: 0) {
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            LazyVStack(spacing: 0) {
+                                if let viewModel {
+                                    ForEach(Array(viewModel.messages.enumerated()), id: \.element.id) { index, message in
+                                        AssistantMessageView(message: message)
+                                            .padding(.vertical, 10)
+                                            .id(message.id)
+                                            .transition(.move(edge: .bottom).combined(with: .opacity))
 
-            VStack(spacing: 0) {
-                headerView
-
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        LazyVStack(spacing: 0) {
-                            if let viewModel {
-                                ForEach(Array(viewModel.messages.enumerated()), id: \.element.id) { index, message in
-                                    AssistantMessageView(message: message)
-                                        .padding(.vertical, 10)
-                                        .id(message.id)
-                                        .transition(.move(edge: .bottom).combined(with: .opacity))
-
-                                    if index < viewModel.messages.count - 1 {
-                                        Divider()
-                                            .opacity(0.1)
-                                            .padding(.horizontal, 24)
+                                        if index < viewModel.messages.count - 1 {
+                                            Divider()
+                                                .opacity(0.1)
+                                                .padding(.horizontal, 24)
+                                        }
                                     }
                                 }
                             }
+                            .padding(.top, 10)
+                            .padding(.bottom, 16)
                         }
-                        .padding(.top, 10)
-                        .padding(.bottom, 16)
-                    }
-                    .scrollDismissesKeyboard(.interactively)
-                    .onChange(of: viewModel?.messages.count) {
-                        if let last = viewModel?.messages.last {
-                            withAnimation(.easeOut(duration: 0.3)) {
-                                proxy.scrollTo(last.id, anchor: .bottom)
+                        .scrollDismissesKeyboard(.interactively)
+                        .onChange(of: viewModel?.messages.count) {
+                            if let last = viewModel?.messages.last {
+                                withAnimation(.easeOut(duration: 0.3)) {
+                                    proxy.scrollTo(last.id, anchor: .bottom)
+                                }
+                            }
+                        }
+                        .onChange(of: viewModel?.messages.last?.toolResults.count) {
+                            if let last = viewModel?.messages.last {
+                                withAnimation(.easeOut(duration: 0.2)) {
+                                    proxy.scrollTo(last.id, anchor: .bottom)
+                                }
+                            }
+                        }
+                        .onChange(of: viewModel?.isGenerating) {
+                            if let last = viewModel?.messages.last {
+                                withAnimation(.easeOut(duration: 0.2)) {
+                                    proxy.scrollTo(last.id, anchor: .bottom)
+                                }
                             }
                         }
                     }
-                    .onChange(of: viewModel?.messages.last?.toolResults.count) {
-                        if let last = viewModel?.messages.last {
-                            withAnimation(.easeOut(duration: 0.2)) {
-                                proxy.scrollTo(last.id, anchor: .bottom)
-                            }
-                        }
-                    }
-                    .onChange(of: viewModel?.isGenerating) {
-                        if let last = viewModel?.messages.last {
-                            withAnimation(.easeOut(duration: 0.2)) {
-                                proxy.scrollTo(last.id, anchor: .bottom)
-                            }
-                        }
+
+                    inputBar
+                }
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                // Leading: icon button (opens icon picker)
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        showIconPicker = true
+                    } label: {
+                        Image(systemName: themeManager.assistantIconName)
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(themeManager.accentColor)
                     }
                 }
 
-                inputBar
+                // Center: name + thinking status
+                ToolbarItem(placement: .principal) {
+                    VStack(spacing: 2) {
+                        Text(themeManager.assistantName.isEmpty ? "Spark" : themeManager.assistantName)
+                            .font(.headline.weight(.semibold))
+                            .foregroundStyle(.primary)
+
+                        if let viewModel, viewModel.isGenerating {
+                            HStack(spacing: 4) {
+                                Image(systemName: "circle.fill")
+                                    .font(.system(size: 5))
+                                    .foregroundStyle(themeManager.accentColor)
+                                    .symbolEffect(.pulse, isActive: true)
+                                Text("Thinking...")
+                                    .font(.caption2)
+                                    .foregroundStyle(themeManager.accentColor)
+                            }
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                        } else {
+                            Text("Apple Intelligence")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .transition(.opacity.combined(with: .move(edge: .bottom)))
+                        }
+                    }
+                    .animation(.easeInOut(duration: 0.2), value: viewModel?.isGenerating)
+                }
+
+                // Trailing: clear + dismiss
+                ToolbarItem(placement: .topBarTrailing) {
+                    HStack(spacing: 12) {
+                        if let viewModel, !viewModel.messages.isEmpty {
+                            Button {
+                                withAnimation(.spring(response: 0.4)) {
+                                    viewModel.clearConversation()
+                                }
+                            } label: {
+                                Image(systemName: "arrow.counterclockwise")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundStyle(.secondary)
+                            }
+                            .transition(.scale.combined(with: .opacity))
+                        }
+
+                        Button {
+                            dismiss()
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .animation(.spring(response: 0.35), value: viewModel?.messages.isEmpty)
+                }
             }
         }
         .onAppear {
@@ -116,85 +185,10 @@ struct AssistantView: View {
                 .presentationBackground(.clear)
                 .interactiveDismissDisabled()
         }
-    }
-
-    // MARK: - Header
-
-    private var headerView: some View {
-        HStack(spacing: 12) {
-            // Sparkles icon in glass circle
-            ZStack {
-                Circle()
-                    .fill(themeManager.accentColor.opacity(0.15))
-                    .frame(width: 36, height: 36)
-                Image(systemName: "sparkles")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(themeManager.accentColor)
-            }
-            .glassEffect(.regular, in: Circle())
-
-            VStack(alignment: .leading, spacing: 1) {
-                Text(themeManager.assistantName.isEmpty ? "Spark" : themeManager.assistantName)
-                    .font(.headline)
-                    .foregroundStyle(.primary)
-
-                if let viewModel, viewModel.isGenerating {
-                    HStack(spacing: 4) {
-                        Image(systemName: "circle.fill")
-                            .font(.system(size: 5))
-                            .foregroundStyle(themeManager.accentColor)
-                            .symbolEffect(.pulse, isActive: true)
-                        Text("Thinking...")
-                            .font(.caption2)
-                            .foregroundStyle(themeManager.accentColor)
-                    }
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-                } else {
-                    Text("Apple Intelligence")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .transition(.opacity.combined(with: .move(edge: .bottom)))
-                }
-            }
-            .animation(.easeInOut(duration: 0.2), value: viewModel?.isGenerating)
-
-            Spacer()
-
-            // Clear button
-            if let viewModel, !viewModel.messages.isEmpty {
-                Button {
-                    withAnimation(.spring(response: 0.4)) {
-                        viewModel.clearConversation()
-                    }
-                } label: {
-                    Image(systemName: "arrow.counterclockwise")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 34, height: 34)
-                        .glassEffect(.regular.interactive(), in: Circle())
-                }
-                .buttonStyle(GlassButtonStyle())
-                .transition(.scale.combined(with: .opacity))
-            }
-
-            // Dismiss button
-            Button {
-                dismiss()
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 34, height: 34)
-                    .glassEffect(.regular.interactive(), in: Circle())
-            }
-            .buttonStyle(GlassButtonStyle())
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 14)
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(.secondary.opacity(0.1))
-                .frame(height: 0.5)
+        .sheet(isPresented: $showIconPicker) {
+            IconPickerView(selectedIcon: $themeManager.assistantIconName)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
         }
     }
 
@@ -250,11 +244,6 @@ struct AssistantView: View {
         .padding(.horizontal, 16)
         .padding(.top, 10)
         .padding(.bottom, max(16, safeAreaBottom))
-        .overlay(alignment: .top) {
-            Rectangle()
-                .fill(.secondary.opacity(0.1))
-                .frame(height: 0.5)
-        }
     }
 
     private var canSend: Bool {

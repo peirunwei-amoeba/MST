@@ -126,6 +126,7 @@ class ThemeManager: ObservableObject {
     @AppStorage("keepScreenOnDuringFocus") private var keepScreenOnDuringFocusRaw: Bool = true
     @AppStorage("timerAlarmSound") private var timerAlarmSoundRaw: String = TimerAlarmSound.fanfare.rawValue
     @AppStorage("assistantName") var assistantName: String = "Spark"
+    @AppStorage("assistantIconName") var assistantIconName: String = "sparkles"
     @AppStorage("userName") var userName: String = ""
     @AppStorage("hasCompletedOnboarding") var hasCompletedOnboarding: Bool = false
 

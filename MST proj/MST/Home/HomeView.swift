@@ -64,11 +64,30 @@ struct HomeView: View {
     // Scroll position state for preserving position during project completion
     @State private var scrollToProjectsOnComplete = false
 
+    // Scene phase for refreshing AI title on resume
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var lastTitleGenerationDate: Date? = nil
+
     var body: some View {
         NavigationStack {
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(spacing: 20) {
+                        // AI-generated caption — inline below nav title, above habits
+                        if !aiNavSubtitle.isEmpty || isGeneratingTitle {
+                            Group {
+                                if !aiNavSubtitle.isEmpty {
+                                    Text(aiNavSubtitle)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .padding(.horizontal, 4)
+                                        .transition(.opacity.combined(with: .move(edge: .top)))
+                                }
+                            }
+                            .animation(.easeInOut(duration: 0.4), value: aiNavSubtitle)
+                        }
+
                         // Habits section (at the top)
                         habitsSection
 
@@ -94,36 +113,29 @@ struct HomeView: View {
             }
             .background(themeManager.backgroundColor)
             .navigationTitle(aiNavTitle.isEmpty ? "Welcome" : aiNavTitle)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
-                    VStack(spacing: 1) {
+                    Group {
                         if aiNavTitle.isEmpty && isGeneratingTitle {
                             // Loading dots while title generates
-                            HStack(spacing: 5) {
+                            HStack(spacing: 4) {
                                 ForEach(0..<3, id: \.self) { i in
                                     Circle()
                                         .fill(Color.secondary.opacity(0.5))
-                                        .frame(width: 5, height: 5)
+                                        .frame(width: 4, height: 4)
                                         .scaleEffect(isGeneratingTitle ? 1.2 : 0.8)
                                         .animation(.easeInOut(duration: 0.5).repeatForever().delay(Double(i) * 0.15), value: isGeneratingTitle)
                                 }
                             }
                         } else {
                             Text(aiNavTitle.isEmpty ? "Welcome" : aiNavTitle)
-                                .font(.headline.weight(.bold))
+                                .font(.subheadline.weight(.semibold))
                                 .lineLimit(1)
                                 .transition(.opacity)
                         }
-                        if !aiNavSubtitle.isEmpty {
-                            Text(aiNavSubtitle)
-                                .font(.system(size: 10))
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                                .transition(.opacity.combined(with: .move(edge: .top)))
-                        }
                     }
                     .animation(.easeInOut(duration: 0.3), value: aiNavTitle)
-                    .animation(.easeInOut(duration: 0.3), value: aiNavSubtitle)
                 }
             }
             .onAppear {
@@ -133,6 +145,20 @@ struct HomeView: View {
             }
             .onDisappear {
                 titleGenerationTask?.cancel()
+            }
+            .onChange(of: scenePhase) { _, newPhase in
+                if newPhase == .active {
+                    // Regenerate title if app resumes after 5+ minutes
+                    let shouldRefresh: Bool
+                    if let lastDate = lastTitleGenerationDate {
+                        shouldRefresh = Date().timeIntervalSince(lastDate) > 300
+                    } else {
+                        shouldRefresh = !isGeneratingTitle && aiNavTitle.isEmpty
+                    }
+                    if shouldRefresh && !isGeneratingTitle {
+                        generateAITitle()
+                    }
+                }
             }
             .sheet(isPresented: $showingAddSheet) {
                 AddAssignmentView()
@@ -858,6 +884,7 @@ struct HomeView: View {
 
             await MainActor.run {
                 isGeneratingTitle = false
+                lastTitleGenerationDate = Date()
             }
         }
     }

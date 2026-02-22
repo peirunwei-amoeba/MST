@@ -29,10 +29,10 @@ struct FloatingAIButton: View {
                         showAssistant = true
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     } label: {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 22, weight: .semibold))
+                        Image(systemName: themeManager.assistantIconName)
+                            .font(.system(size: 24, weight: .semibold))
                             .foregroundStyle(themeManager.accentColor)
-                            .frame(width: 52, height: 52)
+                            .frame(width: 60, height: 60)
                             .glassEffect(.regular.interactive(), in: Circle())
                     }
                     .buttonStyle(GlassButtonStyle())

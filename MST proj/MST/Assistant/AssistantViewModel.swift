@@ -70,7 +70,29 @@ final class AssistantViewModel {
         self.pointsManager = pointsManager
         self.focusTimerBridge = focusTimerBridge
         self.themeManager = themeManager
+        loadConversationHistory()
         createSession()
+    }
+
+    // MARK: - Conversation History Persistence
+
+    private static let historyKey = "conversationHistory"
+    private static let maxSavedMessages = 60
+
+    private func loadConversationHistory() {
+        guard let data = UserDefaults.standard.data(forKey: Self.historyKey),
+              let saved = try? JSONDecoder().decode([AssistantMessage].self, from: data)
+        else { return }
+        messages = saved
+    }
+
+    func saveConversationHistory() {
+        let toSave = messages
+            .filter { !$0.isStreaming }
+            .suffix(Self.maxSavedMessages)
+        if let data = try? JSONEncoder().encode(Array(toSave)) {
+            UserDefaults.standard.set(data, forKey: Self.historyKey)
+        }
     }
 
     private var systemInstructions: String {
@@ -87,6 +109,7 @@ final class AssistantViewModel {
         3. NEVER assume or hallucinate what the user has. Only reference data you received from tools.
         4. When asked about tasks, schedule, or progress, call the relevant tool immediately.
         5. When asked to create or complete items, use the write tools, then confirm what was done.
+        6. ONLY use pauseHabitToday for outdoor or physical activity habits (running, cycling, hiking, sports). NEVER suggest pausing study, reading, or work habits. Only pause if the user explicitly says they cannot do an outdoor activity today.
 
         Be encouraging about streaks and progress. \
         If asked about weather or location, use those tools. \
@@ -108,6 +131,7 @@ final class AssistantViewModel {
             CreateProjectTool(modelContext: modelContext, tracker: tracker),
             CompleteAssignmentTool(modelContext: modelContext, pointsManager: pointsManager, tracker: tracker),
             CompleteHabitTodayTool(modelContext: modelContext, pointsManager: pointsManager, tracker: tracker),
+            PauseHabitTodayTool(modelContext: modelContext, tracker: tracker),
             StartFocusTimerTool(focusTimerBridge: focusTimerBridge, tracker: tracker),
             GetWeatherTool(tracker: tracker),
             GetLocationTool(tracker: tracker)
@@ -199,6 +223,7 @@ final class AssistantViewModel {
         tracker.onCallStarted = nil
         tracker.onCallCompleted = nil
         isGenerating = false
+        saveConversationHistory()
     }
 
     private func streamText(_ text: String, into idx: Int) async {
@@ -216,6 +241,7 @@ final class AssistantViewModel {
 
     func clearConversation() {
         messages.removeAll()
+        UserDefaults.standard.removeObject(forKey: Self.historyKey)
         createSession()
     }
 
@@ -255,6 +281,8 @@ final class AssistantViewModel {
             return ("checkmark.circle.fill", "Completed assignment")
         case "completeHabitToday":
             return ("checkmark.circle.fill", "Completed habit")
+        case "pauseHabitToday":
+            return ("pause.circle.fill", "Paused habit for today")
         case "startFocusTimer":
             return ("timer", "Set focus timer")
         case "getCurrentDate":

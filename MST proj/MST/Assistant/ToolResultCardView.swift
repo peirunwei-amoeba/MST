@@ -16,26 +16,46 @@ import SwiftUI
 import MapKit
 import CoreLocation
 
-// MARK: - App Store–style spinning download ring
+// MARK: - Draw-on progress ring with icon
 
-struct AppStoreLoadingRing: View {
+struct ToolProgressRing: View {
+    let iconName: String
+    @EnvironmentObject private var themeManager: ThemeManager
     @State private var rotation: Double = 0
+    @State private var iconScale: CGFloat = 0.6
+    @State private var iconOpacity: Double = 0
 
     var body: some View {
         ZStack {
+            // Faint background track
             Circle()
-                .stroke(Color.secondary.opacity(0.18), lineWidth: 2)
+                .stroke(Color.secondary.opacity(0.15), lineWidth: 2)
+
+            // Draw-on comet arc — spins continuously
             Circle()
-                .trim(from: 0.05, to: 0.75)
+                .trim(from: 0, to: 0.72)
                 .stroke(
-                    Color.secondary.opacity(0.7),
-                    style: StrokeStyle(lineWidth: 2.2, lineCap: .round)
+                    themeManager.accentColor,
+                    style: StrokeStyle(lineWidth: 2, lineCap: .round)
                 )
-                .rotationEffect(.degrees(rotation))
+                .rotationEffect(.degrees(rotation - 90))
+
+            // Tool icon in center, appears after a moment
+            Image(systemName: iconName)
+                .font(.system(size: 8, weight: .bold))
+                .foregroundStyle(themeManager.accentColor)
+                .scaleEffect(iconScale)
+                .opacity(iconOpacity)
         }
         .onAppear {
+            // Spin the arc continuously
             withAnimation(.linear(duration: 0.9).repeatForever(autoreverses: false)) {
                 rotation = 360
+            }
+            // Draw the icon in with a spring
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.6).delay(0.15)) {
+                iconScale = 1.0
+                iconOpacity = 1.0
             }
         }
     }
@@ -47,6 +67,7 @@ struct ToolResultCardView: View {
     let toolResult: ToolResultInfo
     @EnvironmentObject private var themeManager: ThemeManager
     @State private var contentVisible = false
+    @State private var iconDrawn = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -55,12 +76,13 @@ struct ToolResultCardView: View {
                 // Icon / loading ring
                 ZStack {
                     if toolResult.isExecuting {
-                        AppStoreLoadingRing()
+                        ToolProgressRing(iconName: toolResult.icon)
                             .transition(.opacity)
                     } else {
                         Image(systemName: toolResult.icon)
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(themeManager.accentColor)
+                            .symbolEffect(.drawOn, options: .nonRepeating)
                             .transition(.scale.combined(with: .opacity))
                     }
                 }
@@ -100,9 +122,10 @@ struct ToolResultCardView: View {
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .padding(.trailing, 40)
+        .padding(.trailing, 32)
         .onChange(of: toolResult.isExecuting) { _, newValue in
             if !newValue {
+                iconDrawn = true
                 withAnimation(.spring(response: 0.5, dampingFraction: 0.8).delay(0.1)) {
                     contentVisible = true
                 }
@@ -111,6 +134,7 @@ struct ToolResultCardView: View {
         .onAppear {
             if !toolResult.isExecuting {
                 contentVisible = true
+                iconDrawn = true
             }
         }
     }
@@ -230,3 +254,4 @@ struct ToolResultCardView: View {
         }
     }
 }
+

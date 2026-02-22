@@ -224,6 +224,7 @@ struct AssistantMessageView: View {
                         ToolResultCardView(toolResult: toolResult)
                     }
                 }
+                .padding(.horizontal, 16)
             }
 
             // Text content
