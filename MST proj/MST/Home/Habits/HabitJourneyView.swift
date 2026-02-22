@@ -13,6 +13,7 @@
 //
 
 import SwiftUI
+import UIKit
 import SwiftData
 import FoundationModels
 import ImagePlayground
@@ -404,7 +405,7 @@ private struct StreamingEntryView: View {
             if text.isEmpty {
                 TypingDotsView()
             } else {
-                (Text(text) + Text("▋").foregroundColor(.secondary))
+                Text("\(text)▋")
                     .font(.body)
                     .foregroundStyle(.primary)
             }

@@ -124,6 +124,8 @@ final class HabitJourneyEntry {
 
     func saveImage(at sourceURL: URL, for marker: String) {
         let dest = imageFilePath(for: marker)
+        // Remove any existing file at destination before copying
+        try? FileManager.default.removeItem(at: dest)
         try? FileManager.default.copyItem(at: sourceURL, to: dest)
         var paths = imagePaths
         paths[marker] = dest.path
