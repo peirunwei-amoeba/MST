@@ -41,7 +41,8 @@ class PointsManager: ObservableObject {
     // MARK: - Core Award Logic
 
     /// Awards points if not already awarded for this source+period combination.
-    /// Returns true if points were actually awarded, false if already claimed.
+    /// Returns the points actually awarded (0 if already claimed).
+    /// Pass `triggerAnimation: false` to batch multiple awards and fire one animation manually.
     @discardableResult
     func awardPoints(
         sourceType: String,
@@ -49,8 +50,9 @@ class PointsManager: ObservableObject {
         periodKey: String,
         points: Int,
         sourceTitle: String,
-        modelContext: ModelContext
-    ) -> Bool {
+        modelContext: ModelContext,
+        triggerAnimation: Bool = true
+    ) -> Int {
         // Anti-double-dipping check
         let type = sourceType
         let sid = sourceId
@@ -63,7 +65,7 @@ class PointsManager: ObservableObject {
             }
         )
         let existing = (try? modelContext.fetch(descriptor)) ?? []
-        guard existing.isEmpty else { return false }
+        guard existing.isEmpty else { return 0 }
 
         // Create transaction
         let transaction = PointsTransaction(
@@ -79,21 +81,25 @@ class PointsManager: ObservableObject {
         let ledger = getOrCreateLedger(modelContext: modelContext)
         ledger.totalPointsEarned += points
 
-        // Trigger animation
+        if triggerAnimation {
+            triggerAwardAnimation(points: points)
+        }
+
+        return points
+    }
+
+    /// Fire a single award animation with the combined total points.
+    private func triggerAwardAnimation(points: Int) {
         lastAwardedPoints = points
         awardAnimationID = UUID()
         withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
             isShowingAward = true
         }
-
-        // Auto-dismiss after animation
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                 self?.isShowingAward = false
             }
         }
-
-        return true
     }
 
     // MARK: - Convenience Methods
@@ -111,20 +117,40 @@ class PointsManager: ObservableObject {
             periodKey = formatter.string(from: Date())
         }
 
-        let awarded = awardPoints(
+        // Award base habit point without animation yet
+        let baseAwarded = awardPoints(
             sourceType: "habit",
             sourceId: habit.id,
             periodKey: periodKey,
             points: 1,
             sourceTitle: habit.title,
-            modelContext: modelContext
+            modelContext: modelContext,
+            triggerAnimation: false
         )
 
-        // Check streak milestones if habit point was awarded
-        // Save context first to ensure today's completion is reflected in the streak calculation
-        if awarded {
+        var totalPoints = baseAwarded
+
+        // Check streak milestones and accumulate bonus points
+        if baseAwarded > 0 {
             try? modelContext.save()
-            checkStreakMilestones(habit: habit, modelContext: modelContext)
+            let currentStreak = habit.currentStreak
+            for milestone in Self.streakMilestones where currentStreak >= milestone.streak {
+                let bonusPoints = awardPoints(
+                    sourceType: "streak",
+                    sourceId: habit.id,
+                    periodKey: "milestone-\(milestone.streak)",
+                    points: milestone.points,
+                    sourceTitle: "\(habit.title) (\(milestone.streak)-day streak)",
+                    modelContext: modelContext,
+                    triggerAnimation: false
+                )
+                totalPoints += bonusPoints
+            }
+        }
+
+        // Show a single combined animation for all points earned this completion
+        if totalPoints > 0 {
+            triggerAwardAnimation(points: totalPoints)
         }
     }
 
@@ -148,22 +174,6 @@ class PointsManager: ObservableObject {
             sourceTitle: goal.title,
             modelContext: modelContext
         )
-    }
-
-    // MARK: - Streak Milestones
-
-    private func checkStreakMilestones(habit: Habit, modelContext: ModelContext) {
-        let currentStreak = habit.currentStreak
-        for milestone in Self.streakMilestones where currentStreak >= milestone.streak {
-            awardPoints(
-                sourceType: "streak",
-                sourceId: habit.id,
-                periodKey: "milestone-\(milestone.streak)",
-                points: milestone.points,
-                sourceTitle: "\(habit.title) (\(milestone.streak)-day streak)",
-                modelContext: modelContext
-            )
-        }
     }
 
     // MARK: - Ledger Access

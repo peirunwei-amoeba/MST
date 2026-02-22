@@ -131,6 +131,21 @@ struct AIEncouragementManager {
         }
     }
 
+    /// Cancel the encouragement notification for an assignment that was just completed.
+    static func cancelEncouragement(for assignment: Assignment) {
+        UNUserNotificationCenter.current().removePendingNotificationRequests(
+            withIdentifiers: ["ai-encourage-assignment-\(assignment.id.uuidString)"]
+        )
+    }
+
+    /// Cancel today's habit encouragement notification for a habit that was just completed.
+    static func cancelEncouragement(for habit: Habit) {
+        let today = formattedDate(Date())
+        UNUserNotificationCenter.current().removePendingNotificationRequests(
+            withIdentifiers: ["ai-encourage-habit-\(habit.id.uuidString)-\(today)"]
+        )
+    }
+
     private static func formattedDate(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"

@@ -94,6 +94,38 @@ struct ToolResultInfo: Identifiable, Codable {
     }
 }
 
+// MARK: - Chat Session
+
+struct ChatSession: Identifiable, Codable {
+    let id: UUID
+    var createdDate: Date
+    var messages: [AssistantMessage]
+
+    init(id: UUID = UUID(), createdDate: Date = Date(), messages: [AssistantMessage] = []) {
+        self.id = id
+        self.createdDate = createdDate
+        self.messages = messages
+    }
+
+    /// Short display title derived from the first user message.
+    var displayTitle: String {
+        if let first = messages.first(where: { $0.role == .user }) {
+            let words = first.content.split(separator: " ").prefix(7).joined(separator: " ")
+            return words.isEmpty ? formattedDate : words
+        }
+        return formattedDate
+    }
+
+    private var formattedDate: String {
+        let f = DateFormatter()
+        f.dateStyle = .short
+        f.timeStyle = .short
+        return f.string(from: createdDate)
+    }
+}
+
+// MARK: - Message
+
 struct AssistantMessage: Identifiable, Codable {
     let id: UUID
     let role: MessageRole

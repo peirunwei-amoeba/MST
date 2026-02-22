@@ -31,7 +31,7 @@ struct MSTApp: App {
                     HabitReminderManager.requestNotificationPermission()
                 }
         }
-        .modelContainer(for: [Assignment.self, Project.self, Goal.self, Habit.self, HabitEntry.self, PointsLedger.self, PointsTransaction.self])
+        .modelContainer(for: [Assignment.self, Project.self, Goal.self, Habit.self, HabitEntry.self, PointsLedger.self, PointsTransaction.self, HabitJourneyEntry.self])
     }
 }
 

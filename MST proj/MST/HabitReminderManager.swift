@@ -22,6 +22,12 @@ struct HabitReminderManager {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
     }
 
+    /// Cancel the 7 PM reminder for a habit that was just completed.
+    static func cancelReminder(for habit: Habit) {
+        let center = UNUserNotificationCenter.current()
+        center.removePendingNotificationRequests(withIdentifiers: ["habit-\(habit.id.uuidString)"])
+    }
+
     static func scheduleReminders(modelContext: ModelContext) {
         let center = UNUserNotificationCenter.current()
 

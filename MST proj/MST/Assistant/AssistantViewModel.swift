@@ -74,24 +74,81 @@ final class AssistantViewModel {
         createSession()
     }
 
-    // MARK: - Conversation History Persistence
+    // MARK: - Multi-Chat Persistence
 
-    private static let historyKey = "conversationHistory"
+    private static let chatSessionsKey = "chatSessionsV2"
+    private static let activeChatKey = "activeChatIdV2"
     private static let maxSavedMessages = 60
+    private static let maxChats = 30
+
+    private(set) var currentChatId: UUID = UUID()
+    private(set) var allChatSessions: [ChatSession] = []
 
     private func loadConversationHistory() {
-        guard let data = UserDefaults.standard.data(forKey: Self.historyKey),
-              let saved = try? JSONDecoder().decode([AssistantMessage].self, from: data)
-        else { return }
-        messages = saved
+        allChatSessions = Self.loadAllChats()
+
+        // Restore last active chat id
+        if let idStr = UserDefaults.standard.string(forKey: Self.activeChatKey),
+           let id = UUID(uuidString: idStr),
+           let session = allChatSessions.first(where: { $0.id == id }) {
+            currentChatId = id
+            messages = session.messages
+        } else if let latest = allChatSessions.first {
+            // Fall back to most-recent chat
+            currentChatId = latest.id
+            messages = latest.messages
+        }
+        // Otherwise start fresh with empty messages
+    }
+
+    static func loadAllChats() -> [ChatSession] {
+        guard let data = UserDefaults.standard.data(forKey: chatSessionsKey),
+              let sessions = try? JSONDecoder().decode([ChatSession].self, from: data)
+        else { return [] }
+        return sessions
     }
 
     func saveConversationHistory() {
-        let toSave = messages
-            .filter { !$0.isStreaming }
-            .suffix(Self.maxSavedMessages)
-        if let data = try? JSONEncoder().encode(Array(toSave)) {
-            UserDefaults.standard.set(data, forKey: Self.historyKey)
+        let trimmed = Array(messages.filter { !$0.isStreaming }.suffix(Self.maxSavedMessages))
+        let session = ChatSession(id: currentChatId, createdDate: Date(), messages: trimmed)
+
+        if let idx = allChatSessions.firstIndex(where: { $0.id == currentChatId }) {
+            allChatSessions[idx] = session
+        } else {
+            allChatSessions.insert(session, at: 0)
+        }
+        allChatSessions = Array(allChatSessions.prefix(Self.maxChats))
+
+        if let data = try? JSONEncoder().encode(allChatSessions) {
+            UserDefaults.standard.set(data, forKey: Self.chatSessionsKey)
+        }
+        UserDefaults.standard.set(currentChatId.uuidString, forKey: Self.activeChatKey)
+    }
+
+    func newChat() {
+        if !messages.isEmpty { saveConversationHistory() }
+        currentChatId = UUID()
+        messages = []
+        createSession()
+    }
+
+    func loadChat(_ session: ChatSession) {
+        if !messages.isEmpty { saveConversationHistory() }
+        currentChatId = session.id
+        messages = session.messages
+        createSession()
+        UserDefaults.standard.set(currentChatId.uuidString, forKey: Self.activeChatKey)
+    }
+
+    func deleteChat(id: UUID) {
+        allChatSessions.removeAll { $0.id == id }
+        if let data = try? JSONEncoder().encode(allChatSessions) {
+            UserDefaults.standard.set(data, forKey: Self.chatSessionsKey)
+        }
+        if id == currentChatId {
+            currentChatId = UUID()
+            messages = []
+            createSession()
         }
     }
 
@@ -152,8 +209,6 @@ final class AssistantViewModel {
         isGenerating = true
         tracker.clear()
         messageCount += 1
-
-        if messageCount > 8 { createSession() }
 
         guard let session else {
             messages.append(AssistantMessage(role: .assistant, content: "Apple Intelligence is not available on this device."))
@@ -239,11 +294,6 @@ final class AssistantViewModel {
         }
     }
 
-    func clearConversation() {
-        messages.removeAll()
-        UserDefaults.standard.removeObject(forKey: Self.historyKey)
-        createSession()
-    }
 
     // MARK: - Coordinate parsing
 

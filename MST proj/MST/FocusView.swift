@@ -238,11 +238,6 @@ struct FocusView: View {
                 .transition(.opacity)
             }
         }
-        .overlay {
-            PointsCapsuleView()
-                .padding(.trailing, 20)
-                .padding(.top, 60)
-        }
         .navigationTitle("Focus")
         .navigationBarTitleDisplayMode(.large)
         .sheet(isPresented: $showTaskPicker) {
@@ -590,12 +585,15 @@ struct FocusView: View {
         switch task {
         case .assignment(let assignment):
             assignment.toggleCompletion()
+            AIEncouragementManager.cancelEncouragement(for: assignment)
             pointsManager.awardAssignmentPoints(assignment: assignment, modelContext: modelContext)
         case .goal(let goal):
             goal.toggleCompletion()
             pointsManager.awardGoalPoints(goal: goal, modelContext: modelContext)
         case .habit(let habit):
             habit.completeToday()
+            HabitReminderManager.cancelReminder(for: habit)
+            AIEncouragementManager.cancelEncouragement(for: habit)
             pointsManager.awardHabitPoints(habit: habit, modelContext: modelContext)
         }
 

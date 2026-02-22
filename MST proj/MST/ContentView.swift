@@ -17,7 +17,11 @@ import SwiftData
 
 struct ContentView: View {
     @EnvironmentObject private var themeManager: ThemeManager
+    @EnvironmentObject private var pointsManager: PointsManager
+    @Environment(FocusTimerBridge.self) private var focusTimerBridge
+    @Environment(\.modelContext) private var modelContext
     @State private var showAssistant = false
+    @State private var assistantViewModel: AssistantViewModel?
 
     var body: some View {
         ZStack {
@@ -41,11 +45,29 @@ struct ContentView: View {
             .preferredColorScheme(themeManager.colorScheme)
 
             FloatingAIButton(showAssistant: $showAssistant)
+
+            // Single shared PointsCapsuleView — lives here so it is never duplicated
+            // across tabs, preventing phantom award animations on tab switches.
+            PointsCapsuleView()
+                .padding(.trailing, 20)
+                .padding(.top, 60)
+        }
+        .onAppear {
+            if assistantViewModel == nil {
+                assistantViewModel = AssistantViewModel(
+                    modelContext: modelContext,
+                    pointsManager: pointsManager,
+                    focusTimerBridge: focusTimerBridge,
+                    themeManager: themeManager
+                )
+            }
         }
         .sheet(isPresented: $showAssistant) {
-            AssistantView()
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
+            if let vm = assistantViewModel {
+                AssistantView(viewModel: vm)
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+            }
         }
     }
 }

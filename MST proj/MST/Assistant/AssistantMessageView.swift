@@ -85,11 +85,11 @@ struct MarkdownContentView: View {
                 let text = String(trimmed[match.upperBound...])
                 blocks.append(.numberedItem(text, number: numberedIndex))
             }
-            // Empty line
+            // Empty line — do NOT reset numberedIndex so blank lines inside a list keep counting
             else if trimmed.isEmpty {
-                numberedIndex = 0
+                // intentionally left blank
             }
-            // Normal paragraph
+            // Normal paragraph — resets numbered list context
             else if !trimmed.isEmpty {
                 numberedIndex = 0
                 blocks.append(.paragraph(trimmed))
