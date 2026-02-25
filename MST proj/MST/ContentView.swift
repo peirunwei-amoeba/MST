@@ -62,6 +62,16 @@ struct ContentView: View {
                 )
             }
         }
+        .onChange(of: showAssistant) { _, isShowing in
+            if isShowing && assistantViewModel == nil {
+                assistantViewModel = AssistantViewModel(
+                    modelContext: modelContext,
+                    pointsManager: pointsManager,
+                    focusTimerBridge: focusTimerBridge,
+                    themeManager: themeManager
+                )
+            }
+        }
         .sheet(isPresented: $showAssistant) {
             if let vm = assistantViewModel {
                 AssistantView(viewModel: vm)

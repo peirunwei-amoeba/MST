@@ -17,13 +17,14 @@ import UIKit
 import SwiftData
 import FoundationModels
 import ImagePlayground
+import Combine
 
 // MARK: - Main Journey View
 
 struct HabitJourneyView: View {
     let habit: Habit
     /// Pass `true` when opening from a just-completed check-in so the view auto-generates.
-    var startGenerating: Bool = false
+    @Binding var startGenerating: Bool
 
     @EnvironmentObject private var themeManager: ThemeManager
     @Environment(\.modelContext) private var modelContext
@@ -35,17 +36,12 @@ struct HabitJourneyView: View {
     @State private var streamingText = ""
     @State private var generationTask: Task<Void, Never>?
 
-    // Image Playground state
-    @State private var pendingImageMarker: String?
-    @State private var pendingEntryId: UUID?
-    @State private var showImagePlayground = false
-
     // Highlight the newest entry (just generated)
     @State private var newestEntryId: UUID?
 
-    init(habit: Habit, startGenerating: Bool = false) {
+    init(habit: Habit, startGenerating: Binding<Bool>) {
         self.habit = habit
-        self.startGenerating = startGenerating
+        self._startGenerating = startGenerating
         let habitId = habit.id
         _habitEntries = Query(
             filter: #Predicate<HabitJourneyEntry> { $0.habitId == habitId },
@@ -75,12 +71,7 @@ struct HabitJourneyView: View {
                             ForEach(habitEntries) { entry in
                                 JourneyEntryView(
                                     entry: entry,
-                                    isHighlighted: entry.id == newestEntryId,
-                                    onGenerateImage: { marker in
-                                        pendingImageMarker = marker
-                                        pendingEntryId = entry.id
-                                        showImagePlayground = true
-                                    }
+                                    isHighlighted: entry.id == newestEntryId
                                 )
                                 .id(entry.id)
                             }
@@ -150,23 +141,9 @@ struct HabitJourneyView: View {
                 }
             }
         }
-        .imagePlaygroundSheet(
-            isPresented: $showImagePlayground,
-            concepts: imageConcepts,
-            onCompletion: { url in
-                if let marker = pendingImageMarker, let entryId = pendingEntryId {
-                    saveGeneratedImage(url: url, marker: marker, entryId: entryId)
-                }
-                pendingImageMarker = nil
-                pendingEntryId = nil
-            },
-            onCancellation: {
-                pendingImageMarker = nil
-                pendingEntryId = nil
-            }
-        )
         .onAppear {
             if startGenerating {
+                startGenerating = false
                 startStoryGeneration()
             }
         }
@@ -175,28 +152,14 @@ struct HabitJourneyView: View {
         }
     }
 
-    // MARK: - Image Playground concepts
-
-    private var imageConcepts: [ImagePlaygroundConcept] {
-        guard let marker = pendingImageMarker else { return [] }
-        let description = marker.replacingOccurrences(of: "_", with: " ")
-        return [.text(description)]
-    }
-
-    // MARK: - Save generated image
-
-    private func saveGeneratedImage(url: URL, marker: String, entryId: UUID) {
-        if let entry = habitEntries.first(where: { $0.id == entryId }) {
-            entry.saveImage(at: url, for: marker)
-            try? modelContext.save()
-        }
-    }
-
     // MARK: - Story Generation
 
     func startStoryGeneration() {
         guard !isGenerating else { return }
         guard SystemLanguageModel.default.availability == .available else { return }
+        let today = Calendar.current.startOfDay(for: Date())
+        if let lastEntry = habitEntries.last,
+           Calendar.current.startOfDay(for: lastEntry.date) == today { return }
 
         isGenerating = true
         streamingText = ""
@@ -237,6 +200,15 @@ struct HabitJourneyView: View {
                     newestEntryId = entry.id
                     streamingText = ""
                     isGenerating = false
+
+                    // Spawn background image generation for each scene marker
+                    let markers = HabitJourneyEntry.parse(fullText).compactMap { seg -> String? in
+                        if case .imageMarker(let m) = seg { return m } else { return nil }
+                    }
+                    let savedEntry = entry
+                    for marker in markers {
+                        Task { await autoGenerateImage(for: savedEntry, marker: marker) }
+                    }
                 }
             } catch {
                 await MainActor.run {
@@ -265,8 +237,8 @@ struct HabitJourneyView: View {
         if habitEntries.isEmpty {
             previousStory = "(This is the very first check-in. Start an inspiring new story.)"
         } else {
-            let last3 = habitEntries.suffix(3).map { "Day \($0.checkinNumber): \($0.storyText)" }.joined(separator: "\n\n")
-            previousStory = last3
+            let allEntries = habitEntries.map { "Day \($0.checkinNumber): \($0.storyText)" }.joined(separator: "\n\n")
+            previousStory = allEntries
         }
 
         return """
@@ -290,6 +262,30 @@ struct HabitJourneyView: View {
         5. The placeholder should describe a visual scene that perfectly captures that story moment.
         6. Write ONLY the paragraph — no titles, no labels, no extra commentary.
         """
+    }
+
+    // MARK: - Background Image Generation
+
+    private func autoGenerateImage(for entry: HabitJourneyEntry, marker: String) async {
+        guard ImagePlaygroundViewController.isAvailable else { return }
+        do {
+            let creator = try await ImageCreator()
+            let concepts: [ImagePlaygroundConcept] = [.text(marker.replacingOccurrences(of: "_", with: " "))]
+            let style = creator.availableStyles.first ?? .illustration
+            for try await image in creator.images(for: concepts, style: style, limit: 1) {
+                let dest = entry.imageFilePath(for: marker)
+                if let data = UIImage(cgImage: image.cgImage).pngData() {
+                    try? data.write(to: dest)
+                    await MainActor.run {
+                        var paths = entry.imagePaths
+                        paths[marker] = dest.path
+                        entry.imagePaths = paths
+                        try? modelContext.save()
+                    }
+                }
+                break
+            }
+        } catch { /* silently fail */ }
     }
 
     // MARK: - Empty state
@@ -318,7 +314,6 @@ struct HabitJourneyView: View {
 private struct JourneyEntryView: View {
     let entry: HabitJourneyEntry
     let isHighlighted: Bool
-    let onGenerateImage: (String) -> Void
 
     @State private var appeared = false
 
@@ -350,8 +345,7 @@ private struct JourneyEntryView: View {
                     case .imageMarker(let marker):
                         ImageMarkerView(
                             marker: marker,
-                            savedURL: entry.savedImageURL(for: marker),
-                            onGenerate: { onGenerateImage(marker) }
+                            savedURL: entry.savedImageURL(for: marker)
                         )
                     }
                 }
@@ -447,10 +441,8 @@ private struct TypingDotsView: View {
 private struct ImageMarkerView: View {
     let marker: String
     let savedURL: URL?
-    let onGenerate: () -> Void
 
     @State private var loadedImage: UIImage?
-    @Environment(\.supportsImagePlayground) private var supportsImagePlayground
 
     var displayName: String {
         marker.replacingOccurrences(of: "_", with: " ").capitalized
@@ -466,43 +458,28 @@ private struct ImageMarkerView: View {
                     .frame(height: 200)
                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             } else {
-                Button(action: onGenerate) {
-                    HStack(spacing: 10) {
-                        Image(systemName: "wand.and.sparkles")
-                            .font(.system(size: 18))
-                            .foregroundStyle(.purple)
+                HStack(spacing: 10) {
+                    ProgressView()
+                        .progressViewStyle(.circular)
+                        .tint(.purple)
 
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Generate Scene")
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(.primary)
-                            Text(displayName)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        Spacer()
-
-                        if supportsImagePlayground {
-                            Image(systemName: "chevron.right")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.secondary)
-                        } else {
-                            Text("Not available")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Generating Scene")
+                            .font(.subheadline.weight(.semibold))
+                        Text(displayName)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
-                    .padding(14)
-                    .background(.ultraThinMaterial)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .strokeBorder(.purple.opacity(0.25), lineWidth: 1)
-                    )
+
+                    Spacer()
                 }
-                .buttonStyle(.plain)
-                .disabled(!supportsImagePlayground)
+                .padding(14)
+                .background(.ultraThinMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(.purple.opacity(0.25), lineWidth: 1)
+                )
             }
         }
         .onAppear {
@@ -519,3 +496,4 @@ private struct ImageMarkerView: View {
         }
     }
 }
+

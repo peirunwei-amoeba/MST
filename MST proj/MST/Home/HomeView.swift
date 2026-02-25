@@ -16,6 +16,7 @@ import SwiftUI
 import SwiftData
 import AVFoundation
 import FoundationModels
+internal import _LocationEssentials
 
 // MARK: - Glass Button Style
 
@@ -214,8 +215,7 @@ struct HomeView: View {
                 AddHabitView()
             }
             .sheet(item: $journeyHabit) { habit in
-                HabitJourneyView(habit: habit, startGenerating: journeyStartGenerating)
-                    .onDisappear { journeyStartGenerating = false }
+                HabitJourneyView(habit: habit, startGenerating: $journeyStartGenerating)
             }
             .sheet(item: $selectedHabit) { habit in
                 NavigationStack {
@@ -882,17 +882,8 @@ struct HomeView: View {
 
     // MARK: - Nav Title Font
 
-    /// Returns a font size that scales with the word count so short titles are bigger,
-    /// long titles still fit without truncation.
     private func navTitleFont(for title: String) -> Font {
-        let wordCount = title.split(separator: " ").count
-        if wordCount <= 2 {
-            return .title3.weight(.bold)
-        } else if wordCount == 3 {
-            return .headline.weight(.semibold)
-        } else {
-            return .subheadline.weight(.semibold)
-        }
+        return .title3.weight(.bold)
     }
 
     // MARK: - AI Navigation Title Generation
@@ -929,17 +920,23 @@ struct HomeView: View {
 
                 // Generate title (with optional weather)
                 let weatherPart = weatherContext.isEmpty ? "" : " The weather is \(weatherContext)."
-                let titlePrompt = "Generate a very short, fun, punny navigation title (4-6 words max) for a productivity app home screen. It's \(dayOfWeek) \(greeting)\(userName.isEmpty ? "" : " for \(userName)"). The user has \(pendingCount) pending task\(pendingCount == 1 ? "" : "s") and \(activeHabitCount) active habit\(activeHabitCount == 1 ? "" : "s").\(weatherPart) Be creative, use wordplay or puns. No punctuation at the end. Examples: 'Task Force Assembled', 'Let's Crush It Today', 'Goals Loading...' Just the title, nothing else."
+                let titlePrompt = "Generate a very short, fun, punny navigation title (4-6 words max) for a productivity app home screen. It's \(dayOfWeek) \(greeting)\(userName.isEmpty ? "" : " for \(userName)"). The user has \(pendingCount) pending task\(pendingCount == 1 ? "" : "s") and \(activeHabitCount) active habit\(activeHabitCount == 1 ? "" : "s").\(weatherPart) Be creative, use wordplay or puns. No punctuation at the end. Examples: Task Force Assembled, Let's Crush It Today, Goals Loading... Do NOT include any quotation marks, inverted commas, or quote characters of any kind. Return only the plain text title."
                 let titleResponse = try await session.respond(to: titlePrompt)
                 guard !Task.isCancelled else { return }
 
-                // Stream the title word by word
-                let titleWords = titleResponse.content.trimmingCharacters(in: .whitespacesAndNewlines).components(separatedBy: " ")
-                for (i, word) in titleWords.enumerated() {
+                // Stream the title word by word, stripping any quote characters the model may emit
+                let quoteChars = CharacterSet(charactersIn: "\"\'\u{201C}\u{201D}\u{2018}\u{2019}")
+                let cleanedContent = titleResponse.content
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                    .trimmingCharacters(in: quoteChars)
+                let titleWords = cleanedContent.components(separatedBy: " ")
+                for word in titleWords {
+                    let cleanWord = word.trimmingCharacters(in: quoteChars)
+                    guard !cleanWord.isEmpty else { continue }
                     guard !Task.isCancelled else { return }
                     await MainActor.run {
                         withAnimation(.easeIn(duration: 0.1)) {
-                            aiNavTitle += (i == 0 ? "" : " ") + word
+                            aiNavTitle += (aiNavTitle.isEmpty ? "" : " ") + cleanWord
                         }
                     }
                     try? await Task.sleep(nanoseconds: 60_000_000)
