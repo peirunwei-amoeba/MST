@@ -20,6 +20,7 @@ struct ConcentricHabitCard: View {
     var isRecentlyCompleted: Bool = false
     let onTap: () -> Void
     let onToggleComplete: () -> Void
+    var onJourney: (() -> Void)? = nil
 
     @EnvironmentObject private var themeManager: ThemeManager
 
@@ -131,10 +132,24 @@ struct ConcentricHabitCard: View {
                             .foregroundStyle(.secondary)
                     }
                     .frame(height: 14)
+
+                    // Journey button (Apple Intelligence storyline)
+                    if let journeyAction = onJourney {
+                        Button(action: journeyAction) {
+                            Label("Journey", systemImage: "book.pages.fill")
+                                .font(.system(size: 9, weight: .medium))
+                                .foregroundStyle(.purple)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(.purple.opacity(0.1))
+                                .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
             }
-            .frame(width: 110, height: 150)
-            .padding(.vertical, 16)
+            .frame(width: 110, height: 170)
+            .padding(.vertical, 20)
             .padding(.horizontal, 12)
             .background(.ultraThinMaterial)
             .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))

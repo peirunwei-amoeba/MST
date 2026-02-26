@@ -32,6 +32,7 @@ struct FocusCompletionOverlay: View {
     @State private var holdStartTime: Date?
     @State private var isCompleted = false
     @State private var noTaskAppeared = false
+    @State private var elapsedSeconds: Int = 0
 
     private let holdDuration: Double = 1.2
     private let checkmarkSize: CGFloat = 120
@@ -47,6 +48,12 @@ struct FocusCompletionOverlay: View {
                 taskCompletionContent
             } else {
                 noTaskContent
+            }
+        }
+        .task {
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                elapsedSeconds += 1
             }
         }
     }
@@ -65,6 +72,11 @@ struct FocusCompletionOverlay: View {
                 Text("Great focus session!")
                     .font(.title3)
                     .foregroundStyle(.white.opacity(0.7))
+
+                Text(formattedElapsed(elapsedSeconds))
+                    .font(.subheadline)
+                    .foregroundStyle(.white.opacity(0.5))
+                    .monospacedDigit()
             }
 
             // Static green checkmark
@@ -115,6 +127,11 @@ struct FocusCompletionOverlay: View {
                         .multilineTextAlignment(.center)
                         .lineLimit(2)
                 }
+
+                Text(formattedElapsed(elapsedSeconds))
+                    .font(.subheadline)
+                    .foregroundStyle(.white.opacity(0.5))
+                    .monospacedDigit()
             }
 
             // Giant checkmark with progress ring
@@ -275,6 +292,12 @@ struct FocusCompletionOverlay: View {
                 onComplete()
             }
         }
+    }
+
+    // MARK: - Elapsed Time
+
+    private func formattedElapsed(_ s: Int) -> String {
+        "+\(s / 60):\(String(format: "%02d", s % 60))"
     }
 
     // MARK: - Progressive Haptic Feedback

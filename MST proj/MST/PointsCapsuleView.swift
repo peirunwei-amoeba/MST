@@ -68,7 +68,7 @@ struct PointsCapsuleView: View {
                         .opacity(isExpanded ? 1 : 0)
                 }
             }
-            .glassEffect(.clear, in: .rect(cornerRadius: cornerRadius))
+            .glassEffect(.regular.interactive(), in: .rect(cornerRadius: cornerRadius))
     }
 
     // MARK: - Compact Pill Content

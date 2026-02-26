@@ -13,10 +13,13 @@
 //
 
 import SwiftUI
+import CoreLocation
+import UIKit
 
 struct SettingsView: View {
     @EnvironmentObject private var themeManager: ThemeManager
     @State private var showingChangelog = false
+    @State private var locationAuthStatus: CLAuthorizationStatus = CLLocationManager().authorizationStatus
 
     var body: some View {
         NavigationStack {
@@ -67,6 +70,74 @@ struct SettingsView: View {
                     }
                 }
 
+                // AI Assistant Section
+                Section("AI Assistant") {
+                    HStack {
+                        Label("Assistant Name", systemImage: "sparkles")
+                        Spacer()
+                        TextField("Name", text: Binding(
+                            get: { themeManager.assistantName },
+                            set: { themeManager.assistantName = $0 }
+                        ))
+                        .multilineTextAlignment(.trailing)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 120)
+                    }
+
+                    HStack {
+                        Label("Your Name", systemImage: "person.fill")
+                        Spacer()
+                        TextField("Name", text: Binding(
+                            get: { themeManager.userName },
+                            set: { themeManager.userName = $0 }
+                        ))
+                        .multilineTextAlignment(.trailing)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 120)
+                    }
+                }
+
+                // Your Profile Section
+                Section("Your Profile") {
+                    if themeManager.userProfileSummary.isEmpty {
+                        Text("Chat with the AI assistant to build your profile.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text(themeManager.userProfileSummary)
+                            .font(.subheadline)
+                            .foregroundStyle(.primary)
+                    }
+                }
+
+                // Privacy & Permissions Section
+                Section("Privacy & Permissions") {
+                    Button {
+                        if let url = URL(string: UIApplication.openSettingsURLString) {
+                            UIApplication.shared.open(url)
+                        }
+                    } label: {
+                        HStack {
+                            Label {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Location Access")
+                                    Text(locationStatusDescription)
+                                        .font(.caption)
+                                        .foregroundStyle(locationStatusColor)
+                                }
+                            } icon: {
+                                Image(systemName: "location.fill")
+                            }
+                            Spacer()
+                            Image(systemName: "arrow.up.right.square")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        }
+                        .foregroundStyle(.primary)
+                    }
+
+                }
+
                 // About Section
                 Section("About") {
                     Button {
@@ -94,6 +165,26 @@ struct SettingsView: View {
             .sheet(isPresented: $showingChangelog) {
                 ChangelogView()
             }
+            .onAppear {
+                locationAuthStatus = CLLocationManager().authorizationStatus
+            }
+        }
+    }
+
+    private var locationStatusDescription: String {
+        switch locationAuthStatus {
+        case .authorizedWhenInUse, .authorizedAlways: return "Allowed"
+        case .denied, .restricted: return "Denied — tap to open Settings"
+        case .notDetermined: return "Not requested yet"
+        @unknown default: return "Unknown"
+        }
+    }
+
+    private var locationStatusColor: Color {
+        switch locationAuthStatus {
+        case .authorizedWhenInUse, .authorizedAlways: return .green
+        case .denied, .restricted: return .red
+        default: return .secondary
         }
     }
 }
@@ -169,7 +260,6 @@ struct TimerSoundPickerView: View {
         List {
             ForEach(TimerAlarmSound.allCases) { sound in
                 Button {
-                    sound.play()
                     themeManager.timerAlarmSound = sound
                 } label: {
                     HStack {
@@ -177,6 +267,18 @@ struct TimerSoundPickerView: View {
                             .foregroundStyle(.primary)
 
                         Spacer()
+
+                        if sound != .none {
+                            Button {
+                                sound.play()
+                            } label: {
+                                Image(systemName: "speaker.wave.2.fill")
+                                    .font(.system(size: 14))
+                                    .foregroundStyle(themeManager.accentColor.opacity(0.7))
+                                    .frame(width: 32, height: 32)
+                            }
+                            .buttonStyle(.plain)
+                        }
 
                         if themeManager.timerAlarmSound == sound {
                             Image(systemName: "checkmark")

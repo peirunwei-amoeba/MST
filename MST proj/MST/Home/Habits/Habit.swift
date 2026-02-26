@@ -222,6 +222,33 @@ final class Habit {
     func markMilestoneShown() {
         milestoneShown = true
     }
+
+    // MARK: - Today pause (stored in UserDefaults — no SwiftData schema change needed)
+
+    private var pauseKey: String { "habitPausedDate_\(id.uuidString)" }
+
+    private static let pauseDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
+
+    /// Whether this habit is paused for today only.
+    var isPausedToday: Bool {
+        let todayStr = Self.pauseDateFormatter.string(from: Date())
+        return UserDefaults.standard.string(forKey: pauseKey) == todayStr
+    }
+
+    /// Mark this habit as paused for today. Automatically expires at midnight.
+    func pauseForToday() {
+        let todayStr = Self.pauseDateFormatter.string(from: Date())
+        UserDefaults.standard.set(todayStr, forKey: pauseKey)
+    }
+
+    /// Remove today's pause.
+    func unpauseToday() {
+        UserDefaults.standard.removeObject(forKey: pauseKey)
+    }
 }
 
 // MARK: - HabitFrequency Enum

@@ -15,6 +15,8 @@
 import SwiftUI
 import SwiftData
 import AVFoundation
+import FoundationModels
+internal import _LocationEssentials
 
 // MARK: - Glass Button Style
 
@@ -40,6 +42,12 @@ struct HomeView: View {
     @State private var showingAllAssignments = false
     @State private var recentlyCompletedIds: Set<UUID> = []
 
+    // AI-generated navigation title
+    @State private var aiNavTitle: String = ""
+    @State private var aiNavSubtitle: String = ""
+    @State private var isGeneratingTitle: Bool = false
+    @State private var titleGenerationTask: Task<Void, Never>?
+
     // Project-related state
     @State private var showingAddProjectSheet = false
     @State private var selectedProject: Project?
@@ -54,14 +62,37 @@ struct HomeView: View {
     @State private var recentlyCompletedHabitIds: Set<UUID> = []
     @State private var showingMilestoneCompletion: Habit?
 
+    // Apple Intelligence journey state
+    @State private var journeyHabit: Habit?
+    @State private var journeyStartGenerating = false
+
     // Scroll position state for preserving position during project completion
     @State private var scrollToProjectsOnComplete = false
+
+    // Scene phase for refreshing AI title on resume
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var lastTitleGenerationDate: Date? = nil
 
     var body: some View {
         NavigationStack {
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(spacing: 20) {
+                        // AI-generated caption — inline below nav title, above habits
+                        if !aiNavSubtitle.isEmpty || isGeneratingTitle {
+                            Group {
+                                if !aiNavSubtitle.isEmpty {
+                                    Text(aiNavSubtitle)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .padding(.horizontal, 4)
+                                        .transition(.opacity.combined(with: .move(edge: .top)))
+                                }
+                            }
+                            .animation(.easeInOut(duration: 0.4), value: aiNavSubtitle)
+                        }
+
                         // Habits section (at the top)
                         habitsSection
 
@@ -86,7 +117,55 @@ struct HomeView: View {
                 }
             }
             .background(themeManager.backgroundColor)
-            .navigationTitle("Welcome")
+            .navigationTitle(aiNavTitle.isEmpty ? "Welcome" : aiNavTitle)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Group {
+                        if aiNavTitle.isEmpty && isGeneratingTitle {
+                            // Loading dots while title generates
+                            HStack(spacing: 4) {
+                                ForEach(0..<3, id: \.self) { i in
+                                    Circle()
+                                        .fill(Color.secondary.opacity(0.5))
+                                        .frame(width: 4, height: 4)
+                                        .scaleEffect(isGeneratingTitle ? 1.2 : 0.8)
+                                        .animation(.easeInOut(duration: 0.5).repeatForever().delay(Double(i) * 0.15), value: isGeneratingTitle)
+                                }
+                            }
+                        } else {
+                            Text(aiNavTitle.isEmpty ? "Welcome" : aiNavTitle)
+                                .font(navTitleFont(for: aiNavTitle.isEmpty ? "Welcome" : aiNavTitle))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.7)
+                                .transition(.opacity)
+                        }
+                    }
+                    .animation(.easeInOut(duration: 0.3), value: aiNavTitle)
+                }
+            }
+            .onAppear {
+                if aiNavTitle.isEmpty && !isGeneratingTitle {
+                    generateAITitle()
+                }
+            }
+            .onDisappear {
+                titleGenerationTask?.cancel()
+            }
+            .onChange(of: scenePhase) { _, newPhase in
+                if newPhase == .active {
+                    // Regenerate title if app resumes after 5+ minutes
+                    let shouldRefresh: Bool
+                    if let lastDate = lastTitleGenerationDate {
+                        shouldRefresh = Date().timeIntervalSince(lastDate) > 300
+                    } else {
+                        shouldRefresh = !isGeneratingTitle && aiNavTitle.isEmpty
+                    }
+                    if shouldRefresh && !isGeneratingTitle {
+                        generateAITitle()
+                    }
+                }
+            }
             .sheet(isPresented: $showingAddSheet) {
                 AddAssignmentView()
             }
@@ -135,6 +214,9 @@ struct HomeView: View {
             .sheet(isPresented: $showingAddHabitSheet) {
                 AddHabitView()
             }
+            .sheet(item: $journeyHabit) { habit in
+                HabitJourneyView(habit: habit, startGenerating: $journeyStartGenerating)
+            }
             .sheet(item: $selectedHabit) { habit in
                 NavigationStack {
                     HabitDetailView(habit: habit)
@@ -179,11 +261,6 @@ struct HomeView: View {
                     }
                 )
             }
-        }
-        .overlay {
-            PointsCapsuleView()
-                .padding(.trailing, 20)
-                .padding(.top, 60)
         }
     }
 
@@ -237,7 +314,11 @@ struct HomeView: View {
                                     habit: habit,
                                     isRecentlyCompleted: isRecentlyCompleted,
                                     onTap: { selectedHabit = habit },
-                                    onToggleComplete: { completeHabitWithAnimation(habit) }
+                                    onToggleComplete: { completeHabitWithAnimation(habit) },
+                                    onJourney: {
+                                        journeyStartGenerating = false
+                                        journeyHabit = habit
+                                    }
                                 )
                                 .transition(.asymmetric(
                                     insertion: .identity,
@@ -325,6 +406,10 @@ struct HomeView: View {
                 habit.completeToday()
             }
 
+            // Cancel any pending reminder notifications for this now-done habit
+            HabitReminderManager.cancelReminder(for: habit)
+            AIEncouragementManager.cancelEncouragement(for: habit)
+
             // Award point for habit completion
             pointsManager.awardHabitPoints(habit: habit, modelContext: modelContext)
 
@@ -341,6 +426,14 @@ struct HomeView: View {
                     withAnimation(.easeOut(duration: 0.5)) {
                         _ = recentlyCompletedHabitIds.remove(habit.id)
                     }
+                }
+            }
+
+            // Open the Apple Intelligence journey overlay to generate a story paragraph
+            if SystemLanguageModel.default.availability == .available {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                    journeyStartGenerating = true
+                    journeyHabit = habit
                 }
             }
         } else {
@@ -524,10 +617,16 @@ struct HomeView: View {
             // About to complete - keep it visible temporarily
             recentlyCompletedIds.insert(assignment.id)
 
+            // Cancel any pending notifications for this now-done assignment
+            AIEncouragementManager.cancelEncouragement(for: assignment)
+
             // Toggle completion with animation
             withAnimation {
                 assignment.toggleCompletion()
             }
+
+            // Award points
+            pointsManager.awardAssignmentPoints(assignment: assignment, modelContext: modelContext)
 
             // Remove from visible list after 1 second, then fade out
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
@@ -733,6 +832,148 @@ struct HomeView: View {
                 withAnimation(.easeOut(duration: 0.4)) {
                     _ = recentlyCompletedProjectIds.remove(project.id)
                 }
+            }
+        }
+    }
+
+    // MARK: - Weather Brief (for nav title)
+
+    /// Returns a short weather string like "Clear sky, 22°C" or "" if unavailable.
+    private func fetchWeatherBrief(lat: Double, lon: Double) async -> String {
+        let useImperial = Locale.current.measurementSystem == .us
+        let tempUnit = useImperial ? "fahrenheit" : "celsius"
+        let tempSymbol = useImperial ? "°F" : "°C"
+        var components = URLComponents(string: "https://api.open-meteo.com/v1/forecast")!
+        components.queryItems = [
+            .init(name: "latitude", value: String(format: "%.4f", lat)),
+            .init(name: "longitude", value: String(format: "%.4f", lon)),
+            .init(name: "current", value: "temperature_2m,weather_code"),
+            .init(name: "temperature_unit", value: tempUnit),
+            .init(name: "timezone", value: "auto"),
+            .init(name: "forecast_days", value: "1")
+        ]
+        guard let url = components.url,
+              let (data, _) = try? await URLSession.shared.data(from: url),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let current = json["current"] as? [String: Any],
+              let temp = current["temperature_2m"] as? Double,
+              let code = current["weather_code"] as? Int
+        else { return "" }
+
+        let condition = weatherDescription(for: code)
+        return "\(condition), \(String(format: "%.0f", temp))\(tempSymbol)"
+    }
+
+    private func weatherDescription(for code: Int) -> String {
+        switch code {
+        case 0:       return "clear sky"
+        case 1:       return "mainly clear"
+        case 2:       return "partly cloudy"
+        case 3:       return "overcast"
+        case 45, 48:  return "foggy"
+        case 51, 53, 55: return "drizzly"
+        case 61, 63, 65: return "rainy"
+        case 71, 73, 75: return "snowy"
+        case 80, 81, 82: return "rainy showers"
+        case 95, 96, 99: return "stormy"
+        default:      return "mixed conditions"
+        }
+    }
+
+    // MARK: - Nav Title Font
+
+    private func navTitleFont(for title: String) -> Font {
+        return .title3.weight(.bold)
+    }
+
+    // MARK: - AI Navigation Title Generation
+
+    private func generateAITitle() {
+        guard SystemLanguageModel.default.availability == .available else {
+            aiNavTitle = "Welcome"
+            return
+        }
+
+        titleGenerationTask?.cancel()
+        isGeneratingTitle = true
+        aiNavTitle = ""
+        aiNavSubtitle = ""
+
+        let now = Date()
+        let calendar = Calendar.current
+        let hour = calendar.component(.hour, from: now)
+        let dayOfWeek = calendar.weekdaySymbols[calendar.component(.weekday, from: now) - 1]
+        let userName = themeManager.userName.isEmpty ? "" : themeManager.userName
+        let greeting = hour < 12 ? "morning" : hour < 17 ? "afternoon" : "evening"
+        let pendingCount = upcomingAssignments.count
+        let activeHabitCount = activeHabits.count
+
+        titleGenerationTask = Task {
+            do {
+                // Try to fetch weather for richer title context (gracefully skip if unavailable)
+                var weatherContext = ""
+                if let location = try? await LocationService.shared.getCurrentLocation() {
+                    weatherContext = await fetchWeatherBrief(lat: location.coordinate.latitude, lon: location.coordinate.longitude)
+                }
+
+                let session = LanguageModelSession()
+
+                // Generate title (with optional weather)
+                let weatherPart = weatherContext.isEmpty ? "" : " The weather is \(weatherContext)."
+                let titlePrompt = "Generate a very short, fun, punny navigation title (4-6 words max) for a productivity app home screen. It's \(dayOfWeek) \(greeting)\(userName.isEmpty ? "" : " for \(userName)"). The user has \(pendingCount) pending task\(pendingCount == 1 ? "" : "s") and \(activeHabitCount) active habit\(activeHabitCount == 1 ? "" : "s").\(weatherPart) Be creative, use wordplay or puns. No punctuation at the end. Examples: Task Force Assembled, Let's Crush It Today, Goals Loading... Do NOT include any quotation marks, inverted commas, or quote characters of any kind. Return only the plain text title."
+                let titleResponse = try await session.respond(to: titlePrompt)
+                guard !Task.isCancelled else { return }
+
+                // Stream the title word by word, stripping any quote characters the model may emit
+                let quoteChars = CharacterSet(charactersIn: "\"\'\u{201C}\u{201D}\u{2018}\u{2019}")
+                let cleanedContent = titleResponse.content
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                    .trimmingCharacters(in: quoteChars)
+                let titleWords = cleanedContent.components(separatedBy: " ")
+                for word in titleWords {
+                    let cleanWord = word.trimmingCharacters(in: quoteChars)
+                    guard !cleanWord.isEmpty else { continue }
+                    guard !Task.isCancelled else { return }
+                    await MainActor.run {
+                        withAnimation(.easeIn(duration: 0.1)) {
+                            aiNavTitle += (aiNavTitle.isEmpty ? "" : " ") + cleanWord
+                        }
+                    }
+                    try? await Task.sleep(nanoseconds: 60_000_000)
+                }
+
+                guard !Task.isCancelled else { return }
+
+                // Generate quote
+                let quotePrompt = "Give me one short inspirational quote from a famous person (real, verified quote only). Format exactly as: \"Quote text\" — Person Name. Keep it under 12 words."
+                let quoteResponse = try await session.respond(to: quotePrompt)
+                guard !Task.isCancelled else { return }
+
+                let quote = quoteResponse.content.trimmingCharacters(in: .whitespacesAndNewlines)
+
+                // Stream the quote word by word
+                let quoteWords = quote.components(separatedBy: " ")
+                var builtQuote = ""
+                for (i, word) in quoteWords.enumerated() {
+                    guard !Task.isCancelled else { return }
+                    await MainActor.run {
+                        builtQuote += (i == 0 ? "" : " ") + word
+                        withAnimation(.easeIn(duration: 0.08)) {
+                            aiNavSubtitle = builtQuote
+                        }
+                    }
+                    try? await Task.sleep(nanoseconds: 40_000_000)
+                }
+
+            } catch {
+                await MainActor.run {
+                    if aiNavTitle.isEmpty { aiNavTitle = "Welcome" }
+                }
+            }
+
+            await MainActor.run {
+                isGeneratingTitle = false
+                lastTitleGenerationDate = Date()
             }
         }
     }
@@ -1107,7 +1348,7 @@ struct ConcentricAssignmentRow: View {
 
 #Preview {
     HomeView()
-        .modelContainer(for: [Assignment.self, Project.self, Goal.self, Habit.self, HabitEntry.self, PointsLedger.self, PointsTransaction.self], inMemory: true)
+        .modelContainer(for: [Assignment.self, Project.self, Goal.self, Habit.self, HabitEntry.self, PointsLedger.self, PointsTransaction.self, HabitJourneyEntry.self], inMemory: true)
         .environmentObject(ThemeManager())
         .environmentObject(PointsManager())
 }

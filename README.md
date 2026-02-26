@@ -4,7 +4,7 @@ A comprehensive iOS productivity app for managing assignments, projects, habits,
 
 ## Overview
 
-MST is a modern, native iOS application designed to help students and professionals manage their tasks, projects, habits, and focus time efficiently. Built entirely with Apple's latest frameworks, it features iOS 26's Liquid Glass UI design, seamless data persistence, and intelligent progress tracking across multiple entity types.
+MST is a modern, native iOS application designed to help students and professionals manage their tasks, projects, habits, and focus time efficiently. Built entirely with Apple's latest frameworks, it features iOS 26's Liquid Glass UI design, Apple Intelligence (on-device AI), seamless data persistence, and intelligent progress tracking across multiple entity types.
 
 ## Features
 
@@ -29,13 +29,24 @@ MST is a modern, native iOS application designed to help students and profession
 - **Heatmap Calendar** - Scrollable calendar showing completion history with animated triangles
 - **Progress Rings** - Concentric progress visualization for daily completion
 - **Milestone System** - Set completion day targets (e.g., 60-day challenge)
+- **Pause for Today** - Skip a day without breaking your streak
+- **AI Journey Stories** - Apple Intelligence writes a personalized story paragraph after each check-in, with auto-generated scene images appearing inline
 
 ### Focus Timer
-- **Dual-Ring Timer** - Interactive hour/minute rings with drag-to-set functionality
+- **Single-Ring Countdown** - Clean countdown ring that drains from full to empty during active sessions
+- **Dual-Ring Setup** - Interactive hour/minute rings with drag handles for time selection when idle or paused
+- **Ambient Music** - 6 procedurally generated soundscapes (White Noise, Brown Noise, Rain, Nature, Lo-Fi, Piano) with volume control
 - **Task Integration** - Select assignments or goals to focus on during sessions
-- **Background Support** - Timer continues running when app is backgrounded
+- **Background Support** - Timer and ambient audio continue running when app is backgrounded
 - **Screen Awake** - Optional setting to keep screen on during focus sessions
-- **Completion Celebration** - Animated overlay with bounce effects on session completion
+- **Completion Celebration** - Animated overlay with bounce effects, ripple, and live elapsed-time counter
+
+### Apple Intelligence
+- **AI Assistant** - On-device chatbot powered by FoundationModels with 15 tools for managing all entities
+- **User Profile Summary** - AI automatically generates a profile of your focus areas, strengths, and patterns from conversations, viewable in Settings
+- **Dynamic Home Title** - AI generates a fresh punny title each session using time-of-day, task count, and live weather
+- **Habit Journey Stories** - Personalized narrative generated after each check-in; scene images auto-created with `ImageCreator` in the background; long-press to delete entries
+- **Smart Notifications** - AI-written encouragement notifications for upcoming deadlines
 
 ### User Experience
 - **Unified Dashboard** - Home view displaying assignments, projects, and habits in Liquid Glass cards
@@ -45,6 +56,7 @@ MST is a modern, native iOS application designed to help students and profession
 - **Search Functionality** - Quickly find items by title or description
 - **Swipe Actions** - Context-sensitive swipe gestures for edit, delete, and completion
 - **Customizable Themes** - System, light, or dark mode with customizable accent colors
+- **Gamification** - Points and streak milestone awards with animated capsule overlay
 
 ## Requirements
 
@@ -73,7 +85,13 @@ MST is a modern, native iOS application designed to help students and profession
 
 - **SwiftUI** - Modern declarative UI framework with iOS 26 Liquid Glass effects
 - **SwiftData** - Apple's native data persistence framework
+- **FoundationModels** - On-device Apple Intelligence for AI assistant and content generation
+- **ImagePlayground** - Background scene image generation via `ImageCreator`
+- **WeatherKit** - Live weather context for AI title generation
+- **CoreLocation** - Location access for WeatherKit queries
+- **UserNotifications** - AI-written encouragement push notifications
 - **SF Symbols** - System icons with `.symbolEffect` animations
+- **AVFoundation** - Procedural ambient audio engine via `AVAudioEngine` + `AVAudioSourceNode`
 - **UIKit Integration** - Haptic feedback, system sounds, and idle timer control
 
 ### Project Structure
@@ -81,9 +99,11 @@ MST is a modern, native iOS application designed to help students and profession
 ```
 MST proj/MST/
 ├── MSTApp.swift                    # App entry point with multi-model container
-├── ContentView.swift               # Tab-based navigation (Home, Focus, Settings)
-├── ThemeManager.swift              # Theme, accent color, and focus settings
+├── ContentView.swift               # Tab navigation + floating AI button
+├── ThemeManager.swift              # Theme, accent color, focus settings, userName, userProfileSummary
 ├── SettingsView.swift              # App settings with focus timer toggle
+├── PointsManager.swift             # Gamification points and award animations
+├── PointsCapsuleView.swift         # Floating points overlay
 ├── Models/
 │   ├── Assignment.swift            # SwiftData model for tasks
 │   ├── Project.swift               # SwiftData model for projects
@@ -92,7 +112,7 @@ MST proj/MST/
 │   ├── Priority.swift              # Priority enum with colors
 │   └── TargetUnit.swift            # Unit enum for targets
 ├── Home/
-│   ├── HomeView.swift              # Unified dashboard with glass cards
+│   ├── HomeView.swift              # Unified dashboard; AI nav title
 │   ├── Assignments/
 │   │   ├── AddAssignmentView.swift
 │   │   ├── EditAssignmentView.swift
@@ -107,11 +127,25 @@ MST proj/MST/
 │       ├── AddHabitView.swift
 │       ├── EditHabitView.swift
 │       ├── ConcentricHabitCard.swift
-│       └── HabitHeatmapView.swift
-├── FocusView.swift                 # Focus timer main view
+│       ├── HabitHeatmapView.swift
+│       ├── HabitJourneyView.swift  # AI story journal + auto image generation
+│       └── HabitJourneyEntry.swift # SwiftData model for story entries
+├── Assistant/
+│   ├── AssistantView.swift         # AI chatbot sheet
+│   ├── AssistantViewModel.swift    # LanguageModelSession + 15 tools + user profile summary
+│   ├── AssistantMessageView.swift  # Full markdown rendering
+│   └── IconPickerView.swift        # SF symbol grid picker
+├── Notifications/
+│   ├── AIEncouragementManager.swift
+│   └── HabitReminderManager.swift
+├── Services/
+│   └── LocationService.swift
+├── FocusView.swift                 # Focus timer main view + ambient music controls
 ├── FocusTaskPickerView.swift       # Task/goal selection for focus
-├── FocusCompletionOverlay.swift    # Completion celebration overlay
-└── DualRingTimerView.swift         # Interactive timer rings
+├── FocusCompletionOverlay.swift    # Completion overlay + elapsed counter
+├── FocusTimerBridge.swift          # Observable bridge for cross-tab timer state
+├── DualRingTimerView.swift         # Single countdown ring (running) / dual setup rings (idle)
+└── AmbientMusicEngine.swift        # Procedural audio engine (6 vibes, AVAudioEngine)
 ```
 
 ### Key Components
@@ -127,7 +161,7 @@ MST proj/MST/
 **Views**:
 - **Theme Manager** - Observable class managing theme, accent color, and `keepScreenOnDuringFocus`
 - **Home View** - iOS 26 Liquid Glass cards with `GlassButtonStyle` for press feedback
-- **Focus View** - Dual-ring timer with background support via scene phase handling
+- **Focus View** - Single-ring countdown timer with ambient music and background support via scene phase handling
 - **Habit Heatmap** - Scrollable calendar with staggered triangle animations
 - **Project Detail** - Horizontal timeline with sequential goal completion
 
@@ -170,11 +204,12 @@ MST proj/MST/
 ### Using Focus Timer
 
 1. Navigate to the Focus tab
-2. Drag the outer ring to set hours, inner ring for minutes
+2. Drag the outer ring to set minutes, inner ring for hours
 3. Optionally select a task or goal to focus on
-4. Tap Start to begin the session
-5. Timer continues even when app is backgrounded
-6. Complete the session for celebration animation
+4. Tap the waveform button to choose ambient music (White Noise, Brown Noise, Rain, Nature, Lo-Fi, Piano)
+5. Tap Start to begin — the timer switches to a clean single-ring countdown
+6. Timer and ambient audio continue even when app is backgrounded
+7. Complete the session for celebration animation
 
 ### Customizing Settings
 
@@ -212,12 +247,15 @@ MST proj/MST/
 
 - **Pure SwiftUI** - No UIKit view controllers, fully declarative UI
 - **iOS 26 Liquid Glass** - Native `.glassEffect(.regular.interactive())` for modern glass UI
+- **On-Device Apple Intelligence** - `FoundationModels` for zero-latency, privacy-preserving AI features
+- **Background Image Generation** - `ImageCreator` auto-generates habit journey scene images without popups
+- **Procedural Ambient Audio** - `AVAudioEngine` + `AVAudioSourceNode` generates 6 soundscapes entirely in code (no bundled audio files)
 - **SwiftData Relationships** - Sophisticated cascade and inverse relationships between entities
 - **Background Timer** - Scene phase handling for timer persistence across app states
 - **Computed Properties** - Reactive due date logic, streak calculations, and progress tracking
 - **Enum-Driven Design** - Type-safe priority and unit systems with formatting methods
 - **No Dependencies** - Zero third-party libraries, pure Apple frameworks
-- **iOS 26.2+** - Leverages latest SwiftUI, SwiftData, and Liquid Glass features
+- **iOS 26.2+** - Leverages latest SwiftUI, SwiftData, Liquid Glass, and FoundationModels features
 
 ## Data Model Relationships
 
@@ -256,4 +294,4 @@ This project is licensed under the PolyForm Strict License 1.0.0. See LICENSE fi
 
 ## Acknowledgments
 
-Built with Apple's native frameworks - SwiftUI and SwiftData. Features iOS 26 Liquid Glass design patterns with interactive effects and SF Symbol animations.
+Built with Apple's native frameworks - SwiftUI, SwiftData, FoundationModels, and AVFoundation. Features iOS 26 Liquid Glass design patterns with interactive effects, SF Symbol animations, and procedurally generated ambient audio.

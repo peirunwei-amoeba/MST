@@ -21,6 +21,7 @@ struct DualRingTimerView: View {
     let isPaused: Bool
     let remainingSeconds: Int
     let accentColor: Color
+    var totalSeconds: Int = 0
 
     // Time display in center
     let displayTime: String
@@ -55,6 +56,17 @@ struct DualRingTimerView: View {
         return min(1.0, Double(totalMinutes) / 180.0)  // 3 hours = 180 mins
     }
 
+    /// Progress for single countdown ring (1.0 = full, 0.0 = empty)
+    private var countdownProgress: Double {
+        guard totalSeconds > 0 else { return 0 }
+        return Double(remainingSeconds) / Double(totalSeconds)
+    }
+
+    /// Show single ring when actively counting down (running and not paused)
+    private var showCountdownRing: Bool {
+        isRunning && !isPaused
+    }
+
     var body: some View {
         GeometryReader { geometry in
             let size = min(geometry.size.width, geometry.size.height)
@@ -63,124 +75,135 @@ struct DualRingTimerView: View {
             let innerRadius = outerRadius - outerRingWidth / 2 - innerRingWidth / 2 - ringGap
 
             ZStack {
-                // MARK: - Background Track (Single fused track)
+                if showCountdownRing {
+                    // MARK: - Single Countdown Ring
 
-                // Combined background track for fused appearance
-                Circle()
-                    .stroke(
-                        Color.secondary.opacity(0.15),
-                        lineWidth: outerRingWidth + innerRingWidth + ringGap
-                    )
-                    .frame(width: (outerRadius + innerRadius), height: (outerRadius + innerRadius))
+                    // Background track
+                    Circle()
+                        .stroke(
+                            Color.secondary.opacity(0.15),
+                            lineWidth: outerRingWidth + 4
+                        )
+                        .frame(width: outerRadius * 2, height: outerRadius * 2)
 
-                // MARK: - Hour Ring (Inner) - Progress Arc
+                    // Countdown progress ring
+                    Circle()
+                        .trim(from: 0, to: countdownProgress)
+                        .stroke(
+                            accentColor,
+                            style: StrokeStyle(lineWidth: outerRingWidth + 4, lineCap: .round)
+                        )
+                        .frame(width: outerRadius * 2, height: outerRadius * 2)
+                        .rotationEffect(.degrees(-90))
+                        .animation(.linear(duration: 1), value: countdownProgress)
+                } else {
+                    // MARK: - Dual Ring (Idle / Paused)
 
-                Circle()
-                    .trim(from: 0, to: hourProgress)
-                    .stroke(
-                        accentColor.opacity(0.5),
-                        style: StrokeStyle(lineWidth: innerRingWidth, lineCap: .round)
-                    )
-                    .frame(width: innerRadius * 2, height: innerRadius * 2)
-                    .rotationEffect(.degrees(-90))
-                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: hourProgress)
+                    // Combined background track for fused appearance
+                    Circle()
+                        .stroke(
+                            Color.secondary.opacity(0.15),
+                            lineWidth: outerRingWidth + innerRingWidth + ringGap
+                        )
+                        .frame(width: (outerRadius + innerRadius), height: (outerRadius + innerRadius))
 
-                // MARK: - Minute Ring (Outer) - Progress Arc
+                    // Hour Ring (Inner)
+                    Circle()
+                        .trim(from: 0, to: hourProgress)
+                        .stroke(
+                            accentColor.opacity(0.5),
+                            style: StrokeStyle(lineWidth: innerRingWidth, lineCap: .round)
+                        )
+                        .frame(width: innerRadius * 2, height: innerRadius * 2)
+                        .rotationEffect(.degrees(-90))
+                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: hourProgress)
 
-                Circle()
-                    .trim(from: 0, to: minuteProgress)
-                    .stroke(
-                        accentColor,
-                        style: StrokeStyle(lineWidth: outerRingWidth, lineCap: .round)
-                    )
-                    .frame(width: outerRadius * 2, height: outerRadius * 2)
-                    .rotationEffect(.degrees(-90))
-                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: minuteProgress)
+                    // Minute Ring (Outer)
+                    Circle()
+                        .trim(from: 0, to: minuteProgress)
+                        .stroke(
+                            accentColor,
+                            style: StrokeStyle(lineWidth: outerRingWidth, lineCap: .round)
+                        )
+                        .frame(width: outerRadius * 2, height: outerRadius * 2)
+                        .rotationEffect(.degrees(-90))
+                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: minuteProgress)
 
-                // MARK: - Tick Marks for Minutes (every 5 minutes, small lines)
+                    // Tick Marks
+                    ForEach(0..<60, id: \.self) { minute in
+                        let isMajor = minute % 15 == 0
+                        let isMedium = minute % 5 == 0 && !isMajor
 
-                ForEach(0..<60, id: \.self) { minute in
-                    let isMajor = minute % 15 == 0
-                    let isMedium = minute % 5 == 0 && !isMajor
+                        if isMajor || isMedium {
+                            let angle = Double(minute) / 60.0 * 360.0 - 90
+                            let tickLength: CGFloat = isMajor ? 10 : 6
+                            let tickWidth: CGFloat = isMajor ? 2 : 1.5
 
-                    if isMajor || isMedium {
-                        let angle = Double(minute) / 60.0 * 360.0 - 90
-                        let tickLength: CGFloat = isMajor ? 10 : 6
-                        let tickWidth: CGFloat = isMajor ? 2 : 1.5
-
-                        Rectangle()
-                            .fill(Color.secondary.opacity(isMajor ? 0.4 : 0.25))
-                            .frame(width: tickWidth, height: tickLength)
-                            .offset(y: -(outerRadius + outerRingWidth / 2 + 4))
-                            .rotationEffect(.degrees(angle))
+                            Rectangle()
+                                .fill(Color.secondary.opacity(isMajor ? 0.4 : 0.25))
+                                .frame(width: tickWidth, height: tickLength)
+                                .offset(y: -(outerRadius + outerRingWidth / 2 + 4))
+                                .rotationEffect(.degrees(angle))
+                        }
                     }
-                }
 
-                // MARK: - Labels (60 at top, 15 at right, 30 at bottom, 45 at left)
+                    // Labels
+                    let labelRadius = outerRadius + outerRingWidth / 2 + 22
 
-                // Position labels correctly: 60 at top (0°), 15 at right (90°), 30 at bottom (180°), 45 at left (270°)
-                let labelRadius = outerRadius + outerRingWidth / 2 + 22
+                    Text("60")
+                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                        .foregroundStyle(Color.secondary.opacity(0.6))
+                        .position(x: size / 2, y: size / 2 - labelRadius)
 
-                // 60 (top - 12 o'clock)
-                Text("60")
-                    .font(.system(size: 14, weight: .medium, design: .rounded))
-                    .foregroundStyle(Color.secondary.opacity(0.6))
-                    .position(x: size / 2, y: size / 2 - labelRadius)
+                    Text("15")
+                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                        .foregroundStyle(Color.secondary.opacity(0.6))
+                        .position(x: size / 2 + labelRadius, y: size / 2)
 
-                // 15 (right - 3 o'clock)
-                Text("15")
-                    .font(.system(size: 14, weight: .medium, design: .rounded))
-                    .foregroundStyle(Color.secondary.opacity(0.6))
-                    .position(x: size / 2 + labelRadius, y: size / 2)
+                    Text("30")
+                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                        .foregroundStyle(Color.secondary.opacity(0.6))
+                        .position(x: size / 2, y: size / 2 + labelRadius)
 
-                // 30 (bottom - 6 o'clock)
-                Text("30")
-                    .font(.system(size: 14, weight: .medium, design: .rounded))
-                    .foregroundStyle(Color.secondary.opacity(0.6))
-                    .position(x: size / 2, y: size / 2 + labelRadius)
+                    Text("45")
+                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                        .foregroundStyle(Color.secondary.opacity(0.6))
+                        .position(x: size / 2 - labelRadius, y: size / 2)
 
-                // 45 (left - 9 o'clock)
-                Text("45")
-                    .font(.system(size: 14, weight: .medium, design: .rounded))
-                    .foregroundStyle(Color.secondary.opacity(0.6))
-                    .position(x: size / 2 - labelRadius, y: size / 2)
+                    // Drag Handles
+                    if !isRunning || isPaused {
+                        let minuteAngle = (minuteProgress * 360.0 - 90) * .pi / 180
+                        let minuteHandleX = cos(minuteAngle) * outerRadius
+                        let minuteHandleY = sin(minuteAngle) * outerRadius
 
-                // MARK: - Drag Handles (subtle design)
+                        Circle()
+                            .fill(Color.white)
+                            .frame(width: outerRingWidth + 4, height: outerRingWidth + 4)
+                            .overlay(
+                                Circle()
+                                    .stroke(accentColor, lineWidth: 2)
+                            )
+                            .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
+                            .position(x: size / 2 + minuteHandleX, y: size / 2 + minuteHandleY)
+                            .scaleEffect(isDraggingOuter ? 1.1 : 1.0)
+                            .animation(.spring(response: 0.2), value: isDraggingOuter)
 
-                if !isRunning || isPaused {
-                    // Minute handle (outer ring) - subtle white circle with accent border
-                    let minuteAngle = (minuteProgress * 360.0 - 90) * .pi / 180
-                    let minuteHandleX = cos(minuteAngle) * outerRadius
-                    let minuteHandleY = sin(minuteAngle) * outerRadius
+                        let hourAngle = (hourProgress * 360.0 - 90) * .pi / 180
+                        let hourHandleX = cos(hourAngle) * innerRadius
+                        let hourHandleY = sin(hourAngle) * innerRadius
 
-                    Circle()
-                        .fill(Color.white)
-                        .frame(width: outerRingWidth + 4, height: outerRingWidth + 4)
-                        .overlay(
-                            Circle()
-                                .stroke(accentColor, lineWidth: 2)
-                        )
-                        .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
-                        .position(x: size / 2 + minuteHandleX, y: size / 2 + minuteHandleY)
-                        .scaleEffect(isDraggingOuter ? 1.1 : 1.0)
-                        .animation(.spring(response: 0.2), value: isDraggingOuter)
-
-                    // Hour handle (inner ring) - smaller, more subtle
-                    let hourAngle = (hourProgress * 360.0 - 90) * .pi / 180
-                    let hourHandleX = cos(hourAngle) * innerRadius
-                    let hourHandleY = sin(hourAngle) * innerRadius
-
-                    Circle()
-                        .fill(Color.white)
-                        .frame(width: innerRingWidth + 4, height: innerRingWidth + 4)
-                        .overlay(
-                            Circle()
-                                .stroke(accentColor.opacity(0.7), lineWidth: 1.5)
-                        )
-                        .shadow(color: Color.black.opacity(0.08), radius: 1, x: 0, y: 1)
-                        .position(x: size / 2 + hourHandleX, y: size / 2 + hourHandleY)
-                        .scaleEffect(isDraggingInner ? 1.1 : 1.0)
-                        .animation(.spring(response: 0.2), value: isDraggingInner)
+                        Circle()
+                            .fill(Color.white)
+                            .frame(width: innerRingWidth + 4, height: innerRingWidth + 4)
+                            .overlay(
+                                Circle()
+                                    .stroke(accentColor.opacity(0.7), lineWidth: 1.5)
+                            )
+                            .shadow(color: Color.black.opacity(0.08), radius: 1, x: 0, y: 1)
+                            .position(x: size / 2 + hourHandleX, y: size / 2 + hourHandleY)
+                            .scaleEffect(isDraggingInner ? 1.1 : 1.0)
+                            .animation(.spring(response: 0.2), value: isDraggingInner)
+                    }
                 }
 
                 // MARK: - Center Time Display
@@ -210,7 +233,7 @@ struct DualRingTimerView: View {
                     .onEnded { _ in
                         isDraggingOuter = false
                         isDraggingInner = false
-                        dragLock = .none  // Release lock when finger lifts
+                        dragLock = .none
                     }
             )
         }
