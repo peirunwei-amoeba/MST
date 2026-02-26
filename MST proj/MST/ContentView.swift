@@ -72,7 +72,9 @@ struct ContentView: View {
                 )
             }
         }
-        .sheet(isPresented: $showAssistant) {
+        .sheet(isPresented: $showAssistant, onDismiss: {
+            assistantViewModel?.generateConversationSummary()
+        }) {
             if let vm = assistantViewModel {
                 AssistantView(viewModel: vm)
                     .presentationDetents([.large])

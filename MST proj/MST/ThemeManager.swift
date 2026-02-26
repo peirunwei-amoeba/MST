@@ -112,8 +112,14 @@ enum TimerAlarmSound: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Play the alarm sound with vibration
+    /// Play the alarm sound without vibration (for preview)
     func play() {
+        guard self != .none else { return }
+        AudioServicesPlaySystemSound(systemSoundID)
+    }
+
+    /// Play the alarm sound with vibration (for timer completion)
+    func playWithVibration() {
         guard self != .none else { return }
         AudioServicesPlayAlertSound(systemSoundID)
     }
@@ -129,6 +135,7 @@ class ThemeManager: ObservableObject {
     @AppStorage("assistantIconName") var assistantIconName: String = "sparkles"
     @AppStorage("userName") var userName: String = ""
     @AppStorage("hasCompletedOnboarding") var hasCompletedOnboarding: Bool = false
+    @AppStorage("userProfileSummary") var userProfileSummary: String = ""
 
     var selectedTheme: AppTheme {
         get { AppTheme(rawValue: selectedThemeRaw) ?? .system }

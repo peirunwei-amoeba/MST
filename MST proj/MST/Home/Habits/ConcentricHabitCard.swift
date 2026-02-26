@@ -148,8 +148,8 @@ struct ConcentricHabitCard: View {
                     }
                 }
             }
-            .frame(width: 110, height: 150)
-            .padding(.vertical, 16)
+            .frame(width: 110, height: 170)
+            .padding(.vertical, 20)
             .padding(.horizontal, 12)
             .background(.ultraThinMaterial)
             .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))

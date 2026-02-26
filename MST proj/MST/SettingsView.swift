@@ -97,6 +97,19 @@ struct SettingsView: View {
                     }
                 }
 
+                // Your Profile Section
+                Section("Your Profile") {
+                    if themeManager.userProfileSummary.isEmpty {
+                        Text("Chat with the AI assistant to build your profile.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text(themeManager.userProfileSummary)
+                            .font(.subheadline)
+                            .foregroundStyle(.primary)
+                    }
+                }
+
                 // Privacy & Permissions Section
                 Section("Privacy & Permissions") {
                     Button {
@@ -247,7 +260,6 @@ struct TimerSoundPickerView: View {
         List {
             ForEach(TimerAlarmSound.allCases) { sound in
                 Button {
-                    sound.play()
                     themeManager.timerAlarmSound = sound
                 } label: {
                     HStack {
@@ -255,6 +267,18 @@ struct TimerSoundPickerView: View {
                             .foregroundStyle(.primary)
 
                         Spacer()
+
+                        if sound != .none {
+                            Button {
+                                sound.play()
+                            } label: {
+                                Image(systemName: "speaker.wave.2.fill")
+                                    .font(.system(size: 14))
+                                    .foregroundStyle(themeManager.accentColor.opacity(0.7))
+                                    .frame(width: 32, height: 32)
+                            }
+                            .buttonStyle(.plain)
+                        }
 
                         if themeManager.timerAlarmSound == sound {
                             Image(systemName: "checkmark")

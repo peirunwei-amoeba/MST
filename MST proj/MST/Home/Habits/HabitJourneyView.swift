@@ -39,6 +39,10 @@ struct HabitJourneyView: View {
     // Highlight the newest entry (just generated)
     @State private var newestEntryId: UUID?
 
+    // Delete confirmation
+    @State private var entryToDelete: HabitJourneyEntry?
+    @State private var showDeleteConfirmation = false
+
     init(habit: Habit, startGenerating: Binding<Bool>) {
         self.habit = habit
         self._startGenerating = startGenerating
@@ -74,6 +78,14 @@ struct HabitJourneyView: View {
                                     isHighlighted: entry.id == newestEntryId
                                 )
                                 .id(entry.id)
+                                .contextMenu {
+                                    Button(role: .destructive) {
+                                        entryToDelete = entry
+                                        showDeleteConfirmation = true
+                                    } label: {
+                                        Label("Delete Entry", systemImage: "trash")
+                                    }
+                                }
                             }
 
                             // Streaming new entry
@@ -150,6 +162,34 @@ struct HabitJourneyView: View {
         .onDisappear {
             generationTask?.cancel()
         }
+        .confirmationDialog("Delete this journal entry?", isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
+            Button("Delete", role: .destructive) {
+                if let entry = entryToDelete {
+                    deleteEntry(entry)
+                }
+                entryToDelete = nil
+            }
+            Button("Cancel", role: .cancel) {
+                entryToDelete = nil
+            }
+        } message: {
+            Text("This will permanently remove the entry and its images.")
+        }
+    }
+
+    // MARK: - Delete Entry
+
+    private func deleteEntry(_ entry: HabitJourneyEntry) {
+        // Delete all image files from disk
+        let segments = HabitJourneyEntry.parse(entry.storyText)
+        for segment in segments {
+            if case .imageMarker(let marker) = segment {
+                let fileURL = entry.imageFilePath(for: marker)
+                try? FileManager.default.removeItem(at: fileURL)
+            }
+        }
+        modelContext.delete(entry)
+        try? modelContext.save()
     }
 
     // MARK: - Story Generation
@@ -345,6 +385,7 @@ private struct JourneyEntryView: View {
                     case .imageMarker(let marker):
                         ImageMarkerView(
                             marker: marker,
+                            entry: entry,
                             savedURL: entry.savedImageURL(for: marker)
                         )
                     }
@@ -440,6 +481,7 @@ private struct TypingDotsView: View {
 
 private struct ImageMarkerView: View {
     let marker: String
+    let entry: HabitJourneyEntry
     let savedURL: URL?
 
     @State private var loadedImage: UIImage?
@@ -483,11 +525,24 @@ private struct ImageMarkerView: View {
             }
         }
         .onAppear {
+            // Skip if already loaded (prevents re-render flicker)
+            if loadedImage != nil { return }
+
+            // Check deterministic file path on disk first (more reliable than model dict)
+            let diskURL = entry.imageFilePath(for: marker)
+            if FileManager.default.fileExists(atPath: diskURL.path),
+               let data = try? Data(contentsOf: diskURL) {
+                loadedImage = UIImage(data: data)
+                return
+            }
+
+            // Fall back to model's savedURL
             if let url = savedURL, let data = try? Data(contentsOf: url) {
                 loadedImage = UIImage(data: data)
             }
         }
         .onChange(of: savedURL) {
+            if loadedImage != nil { return }
             if let url = savedURL, let data = try? Data(contentsOf: url) {
                 withAnimation(.easeIn(duration: 0.3)) {
                     loadedImage = UIImage(data: data)

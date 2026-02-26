@@ -12,19 +12,20 @@ Open `MST proj/MST.xcodeproj` in Xcode and build/run with Cmd+R. No package mana
 
 ## Architecture
 
-**Framework Stack**: SwiftUI + SwiftData + FoundationModels + ImagePlayground + HealthKit + WeatherKit + CoreLocation + UserNotifications
+**Framework Stack**: SwiftUI + SwiftData + FoundationModels + ImagePlayground + HealthKit + WeatherKit + CoreLocation + UserNotifications + AVFoundation (procedural ambient audio)
 
 **Entry Point**: `MSTApp.swift` initializes:
 - `ThemeManager` as `@StateObject` passed via `.environmentObject()`
 - `PointsManager` as `@StateObject` for gamification
 - `FocusTimerBridge` as `@State` passed via `.environment()`
+- `AmbientMusicEngine` as `@State` passed via `.environment()`
 - SwiftData `.modelContainer(for: [Assignment.self, Project.self, Goal.self, Habit.self, HabitJourneyEntry.self])`
 
 **Navigation**: Tab-based via `ContentView.swift`
 - Home tab → `HomeView` (unified dashboard showing assignments, projects, and habits)
-- Focus tab → `FocusView` (dual-ring timer with task selection and background support)
-- Settings tab → `SettingsView` (themes, focus timer settings, changelog)
-- Floating AI button → `AssistantView` sheet (Apple Intelligence chatbot with 14 tools)
+- Focus tab → `FocusView` (single-ring countdown timer with ambient music and task selection)
+- Settings tab → `SettingsView` (themes, focus timer settings, user profile, changelog)
+- Floating AI button → `AssistantView` sheet (Apple Intelligence chatbot with 15 tools)
 
 **Data Flow**:
 - `@Query` decorator for reactive SwiftData fetching
@@ -66,7 +67,7 @@ MST proj/MST/
 │       └── HabitJourneyEntry.swift     # SwiftData model for journey entries
 ├── Assistant/
 │   ├── AssistantView.swift             # AI chatbot sheet (FoundationModels)
-│   ├── AssistantViewModel.swift        # LanguageModelSession + 14 tools
+│   ├── AssistantViewModel.swift        # LanguageModelSession + 15 tools + conversation summary
 │   ├── AssistantMessageView.swift      # Full markdown rendering
 │   └── IconPickerView.swift            # SF symbol grid picker
 ├── Notifications/
@@ -79,6 +80,7 @@ MST proj/MST/
 ├── FocusCompletionOverlay.swift
 ├── FocusTimerBridge.swift
 ├── DualRingTimerView.swift
+├── AmbientMusicEngine.swift           # Procedural audio engine (AVAudioEngine + AVAudioSourceNode)
 ├── PointsManager.swift
 ├── PointsCapsuleView.swift
 ├── ThemeManager.swift
@@ -95,16 +97,17 @@ MST proj/MST/
 | `Goal.swift` | SwiftData `@Model` for project milestones with inverse relationship to `Project`, auto-completion logic |
 | `Habit.swift` | SwiftData `@Model` for habits with frequency, streak tracking, `pausedDates`, and completion history |
 | `HabitJourneyEntry.swift` | SwiftData `@Model` for AI-generated story paragraphs; stores text + `imagePathsJSON` mapping markers to PNG files |
-| `ThemeManager.swift` | `@Observable` class managing theme, accent color, focus settings, `userName`, and `assistantIconName` via `@AppStorage` |
+| `ThemeManager.swift` | `@Observable` class managing theme, accent color, focus settings, `userName`, `assistantIconName`, and `userProfileSummary` via `@AppStorage` |
 | `HomeView.swift` | iOS 26 glass-effect cards; AI-generated nav title (FoundationModels + WeatherKit + CoreLocation) |
-| `FocusView.swift` | Dual-ring timer with task selection, background support, and completion overlay |
+| `FocusView.swift` | Focus timer with single-ring countdown, ambient music, task selection, and background support |
 | `FocusCompletionOverlay.swift` | Completion overlay with long-press confirm, ripple animation, and elapsed-time counter |
-| `DualRingTimerView.swift` | Custom circular timer with hour/minute rings and drag interaction |
+| `DualRingTimerView.swift` | Custom circular timer: single countdown ring when running, dual hour/minute rings with drag handles when idle/paused |
+| `AmbientMusicEngine.swift` | `@Observable @MainActor` procedural audio engine with 6 vibes (White Noise, Brown Noise, Rain, Nature, Lo-Fi, Piano) via `AVAudioEngine` + `AVAudioSourceNode` |
 | `ConcentricHabitCard.swift` | Glass-effect habit card with progress ring and bounce animation |
 | `HabitHeatmapView.swift` | Scrollable calendar heatmap showing habit completion history |
-| `HabitJourneyView.swift` | AI story journal per habit; auto-generates entry + background image after each check-in |
+| `HabitJourneyView.swift` | AI story journal per habit; auto-generates entry + background image after each check-in; context menu delete with image cleanup |
 | `ProjectDetailView.swift` | Horizontal timeline view with sequential goal completion |
-| `AssistantViewModel.swift` | `LanguageModelSession` with 14 tools; recreates session every 8 messages; persists history to UserDefaults |
+| `AssistantViewModel.swift` | `LanguageModelSession` with 15 tools; recreates session every 8 messages; persists history to UserDefaults; generates user profile summary on dismiss |
 | `PointsManager.swift` | `@MainActor ObservableObject` managing gamification points, streak milestones, and award animations |
 | `AIEncouragementManager.swift` | Schedules AI-generated encouragement notifications for items with due dates |
 
@@ -167,16 +170,19 @@ Properties: `sortOrder` (0-4), `color` (red/orange/yellow/green/gray)
 - **Progress indicators**: Circular progress rings for habits and projects
 - **Elapsed counter**: Focus completion overlay shows `+M:SS` counter via `.task` auto-cancelled on dismiss
 - **AI nav title**: `HomeView` generates a punny 4–6 word title via `LanguageModelSession` + WeatherKit context; always `.title3.weight(.bold)`, quotes stripped
-- **Habit Journey**: After each check-in, AI streams a story paragraph then auto-generates scene images via `ImageCreator` in background `Task`s; deduplication prevents multiple entries per day
+- **Habit Journey**: After each check-in, AI streams a story paragraph then auto-generates scene images via `ImageCreator` in background `Task`s; deduplication prevents multiple entries per day; long-press context menu to delete entries with disk image cleanup
+- **Ambient Music**: Procedural audio via `AVAudioEngine` + `AVAudioSourceNode`; 6 vibes with volume control; auto-stops on timer completion/reset; `UIBackgroundModes: audio` for background playback
 
 ## Focus Timer
 
-The Focus tab features a dual-ring timer with:
-- Hour and minute selection via ring drag interaction
+The Focus tab features a timer with two modes:
+- **Countdown mode** (running): Single ring draining from full→empty based on `remainingSeconds / totalSeconds`
+- **Setup mode** (idle/paused): Dual rings with drag handles, tick marks, and 15/30/45/60 labels for hour/minute selection
 - Task/goal selection from incomplete items
 - Background timer support (continues when app is backgrounded)
 - Completion overlay with animated feedback
 - Optional "Keep Screen On" setting in ThemeManager
+- Ambient music with 6 procedural vibes (White Noise, Brown Noise, Rain, Nature, Lo-Fi, Piano) and volume slider
 
 **Scene Phase Handling**:
 ```swift
@@ -198,10 +204,31 @@ The Focus tab features a dual-ring timer with:
 
 ## Apple Intelligence Integration
 
-- **AssistantViewModel**: `LanguageModelSession` with 14 tools (CRUD for all entities, streak milestones, pause habit, etc.); session recreated every 8 messages to avoid context bloat; history persisted to UserDefaults key `"conversationHistory"` (max 60 messages)
-- **HabitJourneyView**: Generates story entry on first open after check-in (`@Binding var startGenerating`); deduplicates to one entry per day; feeds **all** previous entries as context; auto-generates scene images via `ImageCreator` in background without any popup
+- **AssistantViewModel**: `LanguageModelSession` with 15 tools (CRUD for all entities, streak milestones, pause habit, user profile, etc.); session recreated every 8 messages to avoid context bloat; history persisted to UserDefaults key `"conversationHistory"` (max 60 messages); generates user profile summary on sheet dismiss via separate `LanguageModelSession`
+- **User Profile Summary**: `generateConversationSummary()` creates a 3-5 sentence profile (focus areas, strengths, patterns) stored in `ThemeManager.userProfileSummary`; appended to system instructions for personalized responses; viewable in Settings; `GetUserSummaryTool` lets the AI access the profile
+- **HabitJourneyView**: Generates story entry on first open after check-in (`@Binding var startGenerating`); deduplicates to one entry per day; feeds **all** previous entries as context; auto-generates scene images via `ImageCreator` in background without any popup; `ImageMarkerView` checks disk path first to prevent re-render flicker
 - **AI Nav Title**: `generateAITitle()` in `HomeView` uses `LanguageModelSession`; strips quote characters from output; always renders at `.title3.weight(.bold)`
 - **AIEncouragementManager**: Schedules AI-generated notification copy for assignments/habits approaching due dates
+
+## Ambient Music Engine
+
+`AmbientMusicEngine` is an `@Observable @MainActor` class using `AVAudioEngine` with `AVAudioSourceNode` for fully procedural audio generation (no bundled audio files).
+
+**Vibes** (each has its own render function in `RenderState`):
+- **White Noise**: Uniform random samples
+- **Brown Noise**: Cumulative random walk with slight decay to center
+- **Rain**: Filtered white noise base + random amplitude drop impacts
+- **Nature**: Brown noise wind + occasional sine wave bird chirps at random frequencies
+- **Lo-Fi**: Pentatonic sine waves with quadratic decay + detuned harmonics + noise bed
+- **Piano**: Sine oscillators with harmonics and exponential decay at randomized pentatonic notes
+
+**Integration**: Menu button in FocusView control bar; volume slider appears when playing; auto-stops on timer completion/reset; `UIBackgroundModes: audio` for background playback.
+
+## Timer Alarm Sound
+
+`TimerAlarmSound` enum provides two playback methods:
+- `play()`: Uses `AudioServicesPlaySystemSound` (sound only, for preview in settings)
+- `playWithVibration()`: Uses `AudioServicesPlayAlertSound` (sound + vibration, for timer completion)
 
 ## SourceKit False Positives
 

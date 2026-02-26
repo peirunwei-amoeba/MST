@@ -16,6 +16,7 @@ import SwiftUI
 import SwiftData
 import CoreLocation
 import FoundationModels
+import Combine
 
 // Thread-safe tracker for tool call activity with real-time callbacks
 final class ToolCallTracker: @unchecked Sendable {
@@ -172,6 +173,7 @@ final class AssistantViewModel {
         If asked about weather or location, use those tools. \
         For focus timer, use startFocusTimer. \
         Format responses clearly with markdown so headings, bold, bullets, and code are all visually distinct.
+        \(themeManager.userProfileSummary.isEmpty ? "" : "\nUser profile (from past conversations):\n\(themeManager.userProfileSummary)")
         """
     }
 
@@ -191,7 +193,8 @@ final class AssistantViewModel {
             PauseHabitTodayTool(modelContext: modelContext, tracker: tracker),
             StartFocusTimerTool(focusTimerBridge: focusTimerBridge, tracker: tracker),
             GetWeatherTool(tracker: tracker),
-            GetLocationTool(tracker: tracker)
+            GetLocationTool(tracker: tracker),
+            GetUserSummaryTool(themeManager: themeManager, tracker: tracker)
         ]
 
         session = LanguageModelSession(tools: tools) {
@@ -311,6 +314,39 @@ final class AssistantViewModel {
         return (CLLocationCoordinate2D(latitude: lat, longitude: lon), name)
     }
 
+    // MARK: - Conversation Summary
+
+    func generateConversationSummary() {
+        guard isAvailable else { return }
+        let userMessages = messages.filter { $0.role == .user }
+        guard userMessages.count >= 4 else { return }
+
+        let recentMessages = messages.suffix(20).map { "\($0.role == .user ? "User" : "Assistant"): \($0.content)" }.joined(separator: "\n")
+        let existingSummary = themeManager.userProfileSummary
+
+        Task {
+            do {
+                let summarySession = LanguageModelSession()
+                let prompt = """
+                Based on the following conversation between a user and their productivity assistant, \
+                create a concise 3-5 sentence profile summary of the user. \
+                Cover their focus areas, strengths, areas for improvement, and any patterns you notice.
+
+                \(existingSummary.isEmpty ? "" : "Existing profile summary (update and refine this):\n\(existingSummary)\n\n")Current conversation:
+                \(recentMessages)
+
+                Write ONLY the summary — no titles, labels, or extra commentary.
+                """
+                let response = try await summarySession.respond(to: prompt)
+                let summary = response.content.trimmingCharacters(in: .whitespacesAndNewlines)
+                await MainActor.run {
+                    themeManager.userProfileSummary = summary
+                    themeManager.objectWillChange.send()
+                }
+            } catch { /* silently fail */ }
+        }
+    }
+
     // MARK: - Tool metadata
 
     func toolInfoFor(_ name: String) -> (icon: String, label: String) {
@@ -341,6 +377,8 @@ final class AssistantViewModel {
             return ("cloud.sun.fill", "Fetched weather")
         case "getLocation":
             return ("location.fill", "Got location")
+        case "getUserSummary":
+            return ("person.text.rectangle.fill", "Got user profile")
         default:
             return ("gearshape.fill", "Processed")
         }
