@@ -16,6 +16,8 @@ import SwiftUI
 import AVFoundation
 
 struct FocusCompletionOverlay: View {
+    @EnvironmentObject private var themeManager: ThemeManager
+
     let taskTitle: String?
     let hasTask: Bool
     let alarmSound: TimerAlarmSound
@@ -79,10 +81,10 @@ struct FocusCompletionOverlay: View {
                     .monospacedDigit()
             }
 
-            // Static green checkmark
+            // Static checkmark
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: checkmarkSize, weight: .medium))
-                .foregroundStyle(.green)
+                .foregroundStyle(themeManager.accentColor)
                 .scaleEffect(noTaskAppeared ? 1.0 : 0.5)
                 .opacity(noTaskAppeared ? 1.0 : 0)
 
@@ -96,7 +98,7 @@ struct FocusCompletionOverlay: View {
                     .foregroundStyle(.white)
                     .padding(.horizontal, 40)
                     .padding(.vertical, 14)
-                    .background(.green, in: Capsule())
+                    .background(themeManager.accentColor, in: Capsule())
             }
             .padding(.bottom, 40)
         }
@@ -146,7 +148,7 @@ struct FocusCompletionOverlay: View {
                     Circle()
                         .trim(from: 0, to: holdProgress)
                         .stroke(
-                            Color.green,
+                            themeManager.accentColor,
                             style: StrokeStyle(lineWidth: 6, lineCap: .round)
                         )
                         .frame(width: checkmarkSize + 30, height: checkmarkSize + 30)
@@ -156,7 +158,7 @@ struct FocusCompletionOverlay: View {
                 // Ripple effect on completion
                 if showRipple {
                     Circle()
-                        .stroke(Color.green.opacity(0.6), lineWidth: 4)
+                        .stroke(themeManager.accentColor.opacity(0.6), lineWidth: 4)
                         .frame(width: checkmarkSize + 30, height: checkmarkSize + 30)
                         .scaleEffect(showRipple ? 2.0 : 1.0)
                         .opacity(showRipple ? 0 : 1)
@@ -165,7 +167,7 @@ struct FocusCompletionOverlay: View {
                 // Checkmark icon
                 Image(systemName: completionBounce ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: checkmarkSize, weight: .medium))
-                    .foregroundStyle(completionBounce ? .green : (isHolding && holdProgress > 0) ? .green.opacity(0.4 + holdProgress * 0.6) : .white.opacity(0.4))
+                    .foregroundStyle(completionBounce ? themeManager.accentColor : (isHolding && holdProgress > 0) ? themeManager.accentColor.opacity(0.4 + holdProgress * 0.6) : .white.opacity(0.4))
                     .contentTransition(.symbolEffect(.replace.magic(fallback: .replace)))
                     .scaleEffect(animatingBounce ? 1.35 : (isHolding ? 1.0 + holdProgress * 0.15 : 1.0))
                     .rotationEffect(.degrees(animatingBounce ? 10 : (isHolding ? holdProgress * 8 : 0)))
@@ -355,6 +357,7 @@ struct FocusCompletionOverlay: View {
         onComplete: {},
         onDismiss: {}
     )
+    .environmentObject(ThemeManager())
 }
 
 #Preview("No Task") {
@@ -365,4 +368,5 @@ struct FocusCompletionOverlay: View {
         onComplete: {},
         onDismiss: {}
     )
+    .environmentObject(ThemeManager())
 }

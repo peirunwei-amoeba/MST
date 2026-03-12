@@ -21,6 +21,7 @@ struct DualRingTimerView: View {
     let isPaused: Bool
     let remainingSeconds: Int
     let accentColor: Color
+    var secondaryAccentColor: Color = .blue
     var totalSeconds: Int = 0
 
     // Time display in center
@@ -111,7 +112,7 @@ struct DualRingTimerView: View {
                     Circle()
                         .trim(from: 0, to: hourProgress)
                         .stroke(
-                            accentColor.opacity(0.5),
+                            secondaryAccentColor,
                             style: StrokeStyle(lineWidth: innerRingWidth, lineCap: .round)
                         )
                         .frame(width: innerRadius * 2, height: innerRadius * 2)
@@ -197,7 +198,7 @@ struct DualRingTimerView: View {
                             .frame(width: innerRingWidth + 4, height: innerRingWidth + 4)
                             .overlay(
                                 Circle()
-                                    .stroke(accentColor.opacity(0.7), lineWidth: 1.5)
+                                    .stroke(secondaryAccentColor, lineWidth: 1.5)
                             )
                             .shadow(color: Color.black.opacity(0.08), radius: 1, x: 0, y: 1)
                             .position(x: size / 2 + hourHandleX, y: size / 2 + hourHandleY)

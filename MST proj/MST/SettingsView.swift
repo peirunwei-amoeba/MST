@@ -37,16 +37,20 @@ struct SettingsView: View {
                         }
                     }
 
-                    // Accent color picker
+                    // Theme picker
                     NavigationLink {
-                        AccentColorPickerView()
+                        ThemePickerView()
                     } label: {
                         HStack {
-                            Text("Accent Color")
+                            Text("Theme")
                             Spacer()
-                            Circle()
-                                .fill(themeManager.accentColor)
-                                .frame(width: 24, height: 24)
+                            HStack(spacing: 6) {
+                                Text(themeManager.selectedNamedTheme.rawValue)
+                                    .foregroundStyle(.secondary)
+                                Circle()
+                                    .fill(themeManager.accentColor)
+                                    .frame(width: 18, height: 18)
+                            }
                         }
                     }
                 }
@@ -189,63 +193,58 @@ struct SettingsView: View {
     }
 }
 
-// MARK: - Accent Color Picker View
+// MARK: - Theme Picker View
 
-struct AccentColorPickerView: View {
+struct ThemePickerView: View {
     @EnvironmentObject private var themeManager: ThemeManager
-    @Environment(\.dismiss) private var dismiss
-
-    let columns = [
-        GridItem(.adaptive(minimum: 60), spacing: 16)
-    ]
 
     var body: some View {
-        ScrollView {
-            LazyVGrid(columns: columns, spacing: 16) {
-                ForEach(AccentColorOption.allCases) { colorOption in
-                    ColorOptionButton(
-                        colorOption: colorOption,
-                        isSelected: themeManager.selectedAccentColorOption == colorOption
-                    ) {
-                        themeManager.selectedAccentColorOption = colorOption
-                    }
+        List {
+            ForEach(NamedTheme.allCases) { theme in
+                ThemeCard(theme: theme, isSelected: themeManager.selectedNamedTheme == theme) {
+                    themeManager.selectedNamedTheme = theme
                 }
             }
-            .padding()
         }
-        .navigationTitle("Accent Color")
+        .navigationTitle("Theme")
         .navigationBarTitleDisplayMode(.inline)
     }
 }
 
-struct ColorOptionButton: View {
-    let colorOption: AccentColorOption
+struct ThemeCard: View {
+    let theme: NamedTheme
     let isSelected: Bool
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 8) {
-                ZStack {
-                    Circle()
-                        .fill(colorOption.color)
-                        .frame(width: 50, height: 50)
+            HStack(spacing: 16) {
+                Image(systemName: theme.iconName)
+                    .font(.title2)
+                    .foregroundStyle(theme.primary)
+                    .frame(width: 36)
 
-                    if isSelected {
-                        Circle()
-                            .strokeBorder(.white, lineWidth: 3)
-                            .frame(width: 50, height: 50)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(theme.rawValue)
+                        .font(.body.weight(.medium))
+                        .foregroundStyle(.primary)
 
-                        Image(systemName: "checkmark")
-                            .font(.headline.bold())
-                            .foregroundStyle(.white)
+                    HStack(spacing: 6) {
+                        Circle().fill(theme.primary).frame(width: 18, height: 18)
+                        Circle().fill(theme.secondary).frame(width: 18, height: 18)
+                        Circle().fill(theme.tertiary).frame(width: 18, height: 18)
                     }
                 }
 
-                Text(colorOption.rawValue)
-                    .font(.caption)
-                    .foregroundStyle(isSelected ? colorOption.color : .secondary)
+                Spacer()
+
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(theme.primary)
+                }
             }
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }

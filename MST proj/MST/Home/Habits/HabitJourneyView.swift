@@ -109,6 +109,24 @@ struct HabitJourneyView: View {
                             endPoint: .bottom
                         )
                     }
+                    .onAppear {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                            if isGenerating {
+                                proxy.scrollTo("streaming", anchor: .bottom)
+                            } else if let last = habitEntries.last {
+                                withAnimation {
+                                    proxy.scrollTo(last.id, anchor: .bottom)
+                                }
+                            }
+                        }
+                    }
+                    .onChange(of: isGenerating) { _, generating in
+                        if generating {
+                            withAnimation {
+                                proxy.scrollTo("streaming", anchor: .bottom)
+                            }
+                        }
+                    }
                     .onChange(of: streamingText) {
                         withAnimation {
                             proxy.scrollTo("streaming", anchor: .bottom)
@@ -137,17 +155,6 @@ struct HabitJourneyView: View {
                     } label: {
                         Image(systemName: "xmark")
                             .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                ToolbarItem(placement: .topBarLeading) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "flame.fill")
-                            .foregroundStyle(.orange)
-                            .font(.caption)
-                        Text("Day \(habit.completedDaysCount) of \(habit.maxCompletionDays)")
-                            .font(.caption.weight(.medium))
                             .foregroundStyle(.secondary)
                     }
                 }

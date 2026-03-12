@@ -205,6 +205,7 @@ struct FocusView: View {
                     isPaused: isPaused,
                     remainingSeconds: remainingSeconds,
                     accentColor: themeManager.accentColor,
+                    secondaryAccentColor: themeManager.secondaryAccentColor,
                     totalSeconds: totalTimerSeconds,
                     displayTime: displayTime,
                     timeLabel: timeLabel

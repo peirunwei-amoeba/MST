@@ -53,7 +53,7 @@ struct ConcentricHabitCard: View {
                         Circle()
                             .trim(from: 0, to: holdProgress)
                             .stroke(
-                                Color.green,
+                                themeManager.accentColor,
                                 style: StrokeStyle(lineWidth: 3, lineCap: .round)
                             )
                             .frame(width: checkmarkSize + 10, height: checkmarkSize + 10)
@@ -63,7 +63,7 @@ struct ConcentricHabitCard: View {
                     // Ripple effect on completion
                     if showRipple {
                         Circle()
-                            .stroke(Color.green.opacity(0.6), lineWidth: 3)
+                            .stroke(themeManager.accentColor.opacity(0.6), lineWidth: 3)
                             .frame(width: checkmarkSize + 10, height: checkmarkSize + 10)
                             .scaleEffect(showRipple ? 1.8 : 1.0)
                             .opacity(showRipple ? 0 : 1)
@@ -72,7 +72,7 @@ struct ConcentricHabitCard: View {
                     // Checkmark icon
                     Image(systemName: habit.isCompletedToday ? "checkmark.circle.fill" : "circle")
                         .font(.system(size: checkmarkSize, weight: .medium))
-                        .foregroundStyle(habit.isCompletedToday ? .green : (isHolding && holdProgress > 0) ? .green.opacity(0.4 + holdProgress * 0.6) : .secondary.opacity(0.5))
+                        .foregroundStyle(habit.isCompletedToday ? themeManager.accentColor : (isHolding && holdProgress > 0) ? themeManager.accentColor.opacity(0.4 + holdProgress * 0.6) : .secondary.opacity(0.5))
                         .contentTransition(.symbolEffect(.replace.magic(fallback: .replace)))
                         .scaleEffect(completionBounce ? 1.35 : (isHolding ? 1.0 + holdProgress * 0.2 : 1.0))
                         .rotationEffect(.degrees(completionBounce ? 10 : (isHolding ? holdProgress * 8 : 0)))
@@ -138,10 +138,10 @@ struct ConcentricHabitCard: View {
                         Button(action: journeyAction) {
                             Label("Journey", systemImage: "book.pages.fill")
                                 .font(.system(size: 9, weight: .medium))
-                                .foregroundStyle(.purple)
+                                .foregroundStyle(themeManager.secondaryAccentColor)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
-                                .background(.purple.opacity(0.1))
+                                .background(themeManager.secondaryAccentColor.opacity(0.1))
                                 .clipShape(Capsule())
                         }
                         .buttonStyle(.plain)

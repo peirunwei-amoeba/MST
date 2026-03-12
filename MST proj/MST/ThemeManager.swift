@@ -40,31 +40,58 @@ enum AppTheme: String, CaseIterable, Identifiable {
     }
 }
 
-enum AccentColorOption: String, CaseIterable, Identifiable {
-    case blue = "Blue"
-    case purple = "Purple"
-    case pink = "Pink"
-    case red = "Red"
-    case orange = "Orange"
-    case yellow = "Yellow"
-    case green = "Green"
-    case teal = "Teal"
-    case indigo = "Indigo"
+enum NamedTheme: String, CaseIterable, Identifiable {
+    case bayley = "Bayley"
+    case hullet = "Hullet"
+    case morrison = "Morrison"
+    case buckley = "Buckley"
+    case moor = "Moor"
 
     var id: String { rawValue }
 
-    var color: Color {
+    var primary: Color {
         switch self {
-        case .blue: return .blue
-        case .purple: return .purple
-        case .pink: return .pink
-        case .red: return .red
-        case .orange: return .orange
-        case .yellow: return .yellow
-        case .green: return .green
-        case .teal: return .teal
-        case .indigo: return .indigo
+        case .bayley:   return Color(hue: 0.128, saturation: 0.90, brightness: 0.95)
+        case .hullet:   return Color(hue: 0.765, saturation: 0.80, brightness: 0.85)
+        case .morrison: return Color(hue: 0.600, saturation: 0.85, brightness: 0.95)
+        case .buckley:  return Color(hue: 0.380, saturation: 0.85, brightness: 0.82)
+        case .moor:     return Color(hue: 0.000, saturation: 0.90, brightness: 0.90)
         }
+    }
+
+    var secondary: Color {
+        switch self {
+        case .bayley:   return Color(hue: 0.105, saturation: 0.85, brightness: 0.82)
+        case .hullet:   return Color(hue: 0.765, saturation: 0.90, brightness: 0.50)
+        case .morrison: return Color(hue: 0.575, saturation: 0.65, brightness: 0.85)
+        case .buckley:  return Color(hue: 0.400, saturation: 0.65, brightness: 0.90)
+        case .moor:     return Color(hue: 0.020, saturation: 0.70, brightness: 0.95)
+        }
+    }
+
+    var tertiary: Color {
+        switch self {
+        case .bayley:   return Color(hue: 0.110, saturation: 0.95, brightness: 0.60)
+        case .hullet:   return Color(hue: 0.765, saturation: 0.70, brightness: 0.18)
+        case .morrison: return Color(hue: 0.630, saturation: 0.90, brightness: 0.50)
+        case .buckley:  return Color(hue: 0.370, saturation: 0.95, brightness: 0.45)
+        case .moor:     return Color(hue: 0.985, saturation: 0.95, brightness: 0.55)
+        }
+    }
+
+    var iconName: String {
+        switch self {
+        case .bayley:   return "sun.max.fill"
+        case .hullet:   return "moon.stars.fill"
+        case .morrison: return "bolt.fill"
+        case .buckley:  return "leaf.fill"
+        case .moor:     return "flame.fill"
+        }
+    }
+
+    /// Hullet forces dark mode; all other themes respect the AppTheme setting.
+    var forcedColorScheme: ColorScheme? {
+        self == .hullet ? .dark : nil
     }
 }
 
@@ -128,7 +155,7 @@ enum TimerAlarmSound: String, CaseIterable, Identifiable {
 @MainActor
 class ThemeManager: ObservableObject {
     @AppStorage("selectedTheme") private var selectedThemeRaw: String = AppTheme.system.rawValue
-    @AppStorage("selectedAccentColor") private var selectedAccentColorRaw: String = AccentColorOption.blue.rawValue
+    @AppStorage("selectedNamedTheme") private var selectedNamedThemeRaw: String = NamedTheme.bayley.rawValue
     @AppStorage("keepScreenOnDuringFocus") private var keepScreenOnDuringFocusRaw: Bool = true
     @AppStorage("timerAlarmSound") private var timerAlarmSoundRaw: String = TimerAlarmSound.fanfare.rawValue
     @AppStorage("assistantName") var assistantName: String = "Spark"
@@ -145,20 +172,28 @@ class ThemeManager: ObservableObject {
         }
     }
 
-    var selectedAccentColorOption: AccentColorOption {
-        get { AccentColorOption(rawValue: selectedAccentColorRaw) ?? .blue }
+    var selectedNamedTheme: NamedTheme {
+        get { NamedTheme(rawValue: selectedNamedThemeRaw) ?? .bayley }
         set {
-            selectedAccentColorRaw = newValue.rawValue
+            selectedNamedThemeRaw = newValue.rawValue
             objectWillChange.send()
         }
     }
 
     var accentColor: Color {
-        selectedAccentColorOption.color
+        selectedNamedTheme.primary
+    }
+
+    var secondaryAccentColor: Color {
+        selectedNamedTheme.secondary
+    }
+
+    var tertiaryAccentColor: Color {
+        selectedNamedTheme.tertiary
     }
 
     var colorScheme: ColorScheme? {
-        selectedTheme.colorScheme
+        selectedNamedTheme.forcedColorScheme ?? selectedTheme.colorScheme
     }
 
     var backgroundColor: Color {
