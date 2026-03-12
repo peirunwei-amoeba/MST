@@ -25,8 +25,16 @@ struct AssistantView: View {
 
     @State private var showOnboarding = false
     @State private var showIconPicker = false
-    @State private var showChatList = false
+    @State private var showChatDropdown = false
     @FocusState private var inputFocused: Bool
+
+    private var currentChatLabel: String {
+        viewModel.allChatSessions
+            .first(where: { $0.id == viewModel.currentChatId })?
+            .displayTitle
+            .split(separator: " ").prefix(5).joined(separator: " ")
+        ?? "New Chat"
+    }
 
     var body: some View {
         NavigationStack {
@@ -109,28 +117,18 @@ struct AssistantView: View {
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                // Leading: icon button (opens icon picker) + chat list button
+                // Leading: back chevron
                 ToolbarItem(placement: .topBarLeading) {
-                    HStack(spacing: 10) {
-                        Button {
-                            showIconPicker = true
-                        } label: {
-                            Image(systemName: themeManager.assistantIconName)
-                                .font(.system(size: 17, weight: .semibold))
-                                .foregroundStyle(themeManager.accentColor)
-                        }
-
-                        Button {
-                            showChatList = true
-                        } label: {
-                            Image(systemName: "bubble.left.and.bubble.right")
-                                .font(.system(size: 15, weight: .medium))
-                                .foregroundStyle(.secondary)
-                        }
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(themeManager.accentColor)
                     }
                 }
 
-                // Center: name + thinking status
+                // Center: name + chat dropdown (or thinking status)
                 ToolbarItem(placement: .principal) {
                     VStack(spacing: 2) {
                         Text(themeManager.assistantName.isEmpty ? "Spark" : themeManager.assistantName)
@@ -149,36 +147,38 @@ struct AssistantView: View {
                             }
                             .transition(.opacity.combined(with: .move(edge: .top)))
                         } else {
-                            Text("Apple Intelligence")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                                .transition(.opacity.combined(with: .move(edge: .bottom)))
+                            Button {
+                                showChatDropdown = true
+                            } label: {
+                                HStack(spacing: 3) {
+                                    Text(currentChatLabel)
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                    Image(systemName: "chevron.down")
+                                        .font(.system(size: 8, weight: .semibold))
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .transition(.opacity.combined(with: .move(edge: .bottom)))
                         }
                     }
                     .animation(.easeInOut(duration: 0.2), value: viewModel.isGenerating)
                 }
 
-                // Trailing: new chat + dismiss
+                // Trailing: new chat (tap) / icon picker (long press)
                 ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 12) {
-                        Button {
+                    Image(systemName: themeManager.assistantIconName)
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(themeManager.accentColor)
+                        .onTapGesture {
                             withAnimation(.spring(response: 0.4)) {
                                 viewModel.newChat()
                             }
-                        } label: {
-                            Image(systemName: "plus")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundStyle(.secondary)
                         }
-
-                        Button {
-                            dismiss()
-                        } label: {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundStyle(.secondary)
+                        .onLongPressGesture(minimumDuration: 0.5) {
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            showIconPicker = true
                         }
-                    }
                 }
             }
         }
@@ -197,10 +197,52 @@ struct AssistantView: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
-        .sheet(isPresented: $showChatList) {
-            ChatListView(viewModel: viewModel)
-                .presentationDetents([.medium, .large])
+        .sheet(isPresented: $showChatDropdown) {
+            chatListSheet
+                .presentationDetents([.medium, .fraction(0.4)])
                 .presentationDragIndicator(.visible)
+        }
+    }
+
+    private var chatListSheet: some View {
+        NavigationStack {
+            List {
+                ForEach(viewModel.allChatSessions) { session in
+                    Button {
+                        viewModel.loadChat(session)
+                        showChatDropdown = false
+                    } label: {
+                        Label {
+                            Text(session.displayTitle)
+                                .foregroundStyle(.primary)
+                        } icon: {
+                            Image(systemName: session.id == viewModel.currentChatId
+                                  ? "checkmark.bubble.fill" : "bubble.left")
+                                .foregroundStyle(session.id == viewModel.currentChatId
+                                                 ? themeManager.accentColor : .secondary)
+                        }
+                    }
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        Button(role: .destructive) {
+                            viewModel.deleteChat(id: session.id)
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
+                }
+
+                Button {
+                    withAnimation(.spring(response: 0.4)) {
+                        viewModel.newChat()
+                    }
+                    showChatDropdown = false
+                } label: {
+                    Label("New Chat", systemImage: "plus.bubble")
+                        .foregroundStyle(themeManager.accentColor)
+                }
+            }
+            .navigationTitle("Chats")
+            .navigationBarTitleDisplayMode(.inline)
         }
     }
 

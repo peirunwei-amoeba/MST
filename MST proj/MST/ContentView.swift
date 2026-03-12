@@ -22,35 +22,58 @@ struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var showAssistant = false
     @State private var assistantViewModel: AssistantViewModel?
+    @State private var selectedTab: Int = 0
+    @State private var showCapsuleOnFocus: Bool = false
+
+    private var isOnFocusTab: Bool { selectedTab == 1 }
 
     var body: some View {
         ZStack {
-            TabView {
+            TabView(selection: $selectedTab) {
                 HomeView()
                     .tabItem {
                         Label("Home", systemImage: "house.fill")
                     }
+                    .tag(0)
 
                 FocusView()
                     .tabItem {
                         Label("Focus", systemImage: "timer")
                     }
+                    .tag(1)
 
                 SettingsView()
                     .tabItem {
                         Label("Settings", systemImage: "gearshape.fill")
                     }
+                    .tag(2)
             }
             .tint(themeManager.accentColor)
             .preferredColorScheme(themeManager.colorScheme)
 
-            FloatingAIButton(showAssistant: $showAssistant)
+            if !isOnFocusTab {
+                FloatingAIButton(showAssistant: $showAssistant)
+            }
 
-            // Single shared PointsCapsuleView — lives here so it is never duplicated
-            // across tabs, preventing phantom award animations on tab switches.
-            PointsCapsuleView()
-                .padding(.trailing, 20)
-                .padding(.top, 60)
+            // PointsCapsuleView: always visible on non-Focus tabs;
+            // briefly appears on Focus tab when points are awarded.
+            if !isOnFocusTab || showCapsuleOnFocus {
+                PointsCapsuleView()
+                    .padding(.trailing, 20)
+                    .padding(.top, 60)
+                    .transition(.opacity)
+            }
+        }
+        .onChange(of: pointsManager.awardAnimationID) { _, _ in
+            guard isOnFocusTab else { return }
+            withAnimation(.easeIn(duration: 0.2)) {
+                showCapsuleOnFocus = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                withAnimation(.easeOut(duration: 0.3)) {
+                    showCapsuleOnFocus = false
+                }
+            }
         }
         .onAppear {
             if assistantViewModel == nil {
@@ -72,13 +95,11 @@ struct ContentView: View {
                 )
             }
         }
-        .sheet(isPresented: $showAssistant, onDismiss: {
+        .fullScreenCover(isPresented: $showAssistant, onDismiss: {
             assistantViewModel?.generateConversationSummary()
         }) {
             if let vm = assistantViewModel {
                 AssistantView(viewModel: vm)
-                    .presentationDetents([.large])
-                    .presentationDragIndicator(.visible)
             }
         }
     }

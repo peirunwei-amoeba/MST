@@ -14,7 +14,7 @@
 
 import SwiftUI
 import SwiftData
-import AVFoundation
+import AudioToolbox
 
 // MARK: - Glass Button Style (for Focus tab controls)
 
@@ -108,7 +108,6 @@ struct FocusView: View {
     @EnvironmentObject private var themeManager: ThemeManager
     @EnvironmentObject private var pointsManager: PointsManager
     @Environment(FocusTimerBridge.self) private var focusTimerBridge
-    @Environment(AmbientMusicEngine.self) private var ambientMusic
 
     // Data queries
     @Query(filter: #Predicate<Assignment> { !$0.isCompleted })
@@ -140,7 +139,6 @@ struct FocusView: View {
     // Completion state
     @State private var showCompletionOverlay: Bool = false
     @State private var totalTimerSeconds: Int = 0
-    @State private var showAmbientVolume: Bool = false
 
     // Computed properties
     private var totalSelectedMinutes: Int {
@@ -388,13 +386,12 @@ struct FocusView: View {
     // MARK: - Control Buttons
 
     private var controlButtons: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 0) {
             HStack(spacing: 20) {
                 if isRunning || isPaused {
                     // Reset button
                     Button {
                         resetTimer()
-                        ambientMusic.stop()
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     } label: {
                         Image(systemName: "xmark")
@@ -434,68 +431,8 @@ struct FocusView: View {
                 .buttonStyle(FocusGlassButtonStyle())
                 .disabled(totalSelectedMinutes == 0 && !isPaused)
                 .opacity(totalSelectedMinutes == 0 && !isPaused ? 0.5 : 1)
-
-                // Ambient music button
-                Menu {
-                    ForEach(AmbientVibe.allCases) { vibe in
-                        Button {
-                            if ambientMusic.currentVibe == vibe && ambientMusic.isPlaying {
-                                ambientMusic.stop()
-                            } else {
-                                ambientMusic.play(vibe: vibe)
-                            }
-                        } label: {
-                            Label {
-                                Text(vibe.rawValue)
-                            } icon: {
-                                Image(systemName: ambientMusic.currentVibe == vibe && ambientMusic.isPlaying ? "checkmark" : vibe.icon)
-                            }
-                        }
-                    }
-
-                    Divider()
-
-                    if ambientMusic.isPlaying {
-                        Button(role: .destructive) {
-                            ambientMusic.stop()
-                        } label: {
-                            Label("Stop", systemImage: "stop.fill")
-                        }
-                    }
-                } label: {
-                    Image(systemName: ambientMusic.isPlaying ? "waveform" : "waveform")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(ambientMusic.isPlaying ? themeManager.accentColor : .primary)
-                        .frame(width: 52, height: 52)
-                        .glassEffect(.regular.interactive())
-                        .clipShape(Circle())
-                        .symbolEffect(.variableColor.iterative, isActive: ambientMusic.isPlaying)
-                }
-                .buttonStyle(FocusGlassButtonStyle())
-            }
-
-            // Volume slider (visible when ambient music is playing)
-            if ambientMusic.isPlaying {
-                HStack(spacing: 12) {
-                    Image(systemName: "speaker.fill")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    Slider(value: Binding(
-                        get: { Double(ambientMusic.volume) },
-                        set: { ambientMusic.setVolume(Float($0)) }
-                    ), in: 0...1)
-                    .tint(themeManager.accentColor)
-
-                    Image(systemName: "speaker.wave.3.fill")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.horizontal, 40)
-                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .animation(.easeInOut(duration: 0.3), value: ambientMusic.isPlaying)
     }
 
     // MARK: - Timer Functions
@@ -602,7 +539,6 @@ struct FocusView: View {
         timer = nil
         isRunning = false
         isPaused = false
-        ambientMusic.stop()
 
         // Haptic burst and alarm sound
         UINotificationFeedbackGenerator().notificationOccurred(.success)
@@ -687,5 +623,4 @@ struct FocusView: View {
     .environmentObject(ThemeManager())
     .environmentObject(PointsManager())
     .environment(FocusTimerBridge())
-    .environment(AmbientMusicEngine())
 }
