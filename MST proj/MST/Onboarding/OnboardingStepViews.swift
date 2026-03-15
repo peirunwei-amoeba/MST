@@ -95,6 +95,7 @@ struct WelcomeStep: View {
                 .foregroundStyle(.primary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 18)
+                .contentShape(Capsule())
             }
             .glassEffect(.regular.tint(themeManager.accentColor.opacity(0.35)).interactive(), in: .capsule)
             .buttonStyle(.plain)
@@ -308,6 +309,7 @@ struct GenderStep: View {
                             }
                             .padding(.horizontal, 22)
                             .padding(.vertical, 15)
+                            .contentShape(Capsule())
                         }
                         .glassEffect(
                             gender == option
@@ -407,6 +409,7 @@ struct EducationStep: View {
                             }
                             .padding(.horizontal, 22)
                             .padding(.vertical, 14)
+                            .contentShape(Capsule())
                         }
                         .glassEffect(
                             educationSystem == option.name
@@ -590,6 +593,7 @@ struct InterestsStep: View {
                                 .foregroundStyle(showOtherField ? themeManager.accentColor : .primary)
                                 .padding(.horizontal, 14)
                                 .padding(.vertical, 10)
+                                .contentShape(Capsule())
                         }
                         .glassEffect(
                             showOtherField
@@ -637,6 +641,7 @@ struct InterestsStep: View {
                 .lineLimit(1)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
+                .contentShape(Capsule())
         }
         .glassEffect(
             isSelected
@@ -710,6 +715,7 @@ struct CompletionStep: View {
                     .foregroundStyle(.primary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 18)
+                    .contentShape(Capsule())
                 }
                 .glassEffect(.regular.tint(themeManager.accentColor.opacity(0.35)).interactive(), in: .capsule)
                 .buttonStyle(.plain)
@@ -747,6 +753,7 @@ struct GlassContinueButton: View {
             .foregroundStyle(disabled ? Color.primary.opacity(0.3) : .primary)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 17)
+            .contentShape(Capsule())
         }
         .glassEffect(
             disabled

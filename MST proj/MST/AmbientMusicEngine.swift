@@ -498,9 +498,10 @@ final class AmbientMusicEngine {
 
     nonisolated private static func renderKick(into buf: UnsafeMutablePointer<Float>, total: Int,
                                     start: Int, sr: Float) {
-        let durSamples = Int(0.4 * sr)
-        let sweepLen = Int(0.12 * sr)
-        let clickLen = Int(0.015 * sr)
+        let durSamples  = Int(0.4  * sr)
+        let sweepLen    = Int(0.12 * sr)  // freq sweep: 150 → 40 Hz
+        let gainRampEnd = Int(0.35 * sr)  // gain ramp: 0.22 → 0.001
+        let clickLen    = Int(0.015 * sr)
         var kickPhase: Float = 0
 
         for i in 0..<durSamples {
@@ -509,16 +510,25 @@ final class AmbientMusicEngine {
                 if idx >= total { break }
                 continue
             }
+
+            // Exponential frequency sweep (matches JS exponentialRampToValueAtTime)
+            // freq = 150 * (40/150)^(i/sweepLen)
             let freq: Float = i < sweepLen
-                ? 150.0 - 110.0 * Float(i) / Float(sweepLen)
+                ? 150.0 * powf(40.0 / 150.0, Float(i) / Float(sweepLen))
                 : 40.0
-            let env = 0.22 * max(0, powf(0.001, Float(i) / Float(durSamples)))
+
+            // Exponential gain decay: 0.22 → 0.001 over 350ms (matches JS)
+            let env: Float = i < gainRampEnd
+                ? 0.22 * powf(0.001 / 0.22, Float(i) / Float(gainRampEnd))
+                : 0.001
+
             buf[idx] += sinf(kickPhase) * env
             kickPhase += 2.0 * .pi * freq / sr
+            if kickPhase > 2.0 * .pi { kickPhase -= 2.0 * .pi }
 
-            // Click transient
+            // Click transient: square at 800 Hz, exponential decay 0.06 → 0.001 over 15ms
             if i < clickLen {
-                let clickEnv = 0.06 * (1.0 - Float(i) / Float(clickLen))
+                let clickEnv = 0.06 * powf(0.001 / 0.06, Float(i) / Float(max(1, clickLen)))
                 let cPhase = Float(i) * 2.0 * .pi * 800.0 / sr
                 buf[idx] += (cPhase.truncatingRemainder(dividingBy: 2.0 * .pi) < .pi ? 1.0 : -1.0) * clickEnv
             }

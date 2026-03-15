@@ -47,15 +47,23 @@ struct OnboardingView: View {
 
     var body: some View {
         ZStack {
-            // Vivid layered background so glass has rich colours to refract
-            themeManager.accentColor
-                .opacity(0.35)
-                .ignoresSafeArea()
-
+            // Buckley green → white background
             LinearGradient(
                 colors: [
-                    themeManager.accentColor.opacity(0.55),
-                    themeManager.secondaryAccentColor.opacity(0.35),
+                    Color(hue: 0.380, saturation: 0.82, brightness: 0.78), // Buckley primary
+                    Color(hue: 0.382, saturation: 0.55, brightness: 0.90), // mid green
+                    Color(hue: 0.385, saturation: 0.20, brightness: 0.97), // very light green
+                    Color.white
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+
+            // Subtle green tint overlay from leading edge
+            LinearGradient(
+                colors: [
+                    Color(hue: 0.378, saturation: 0.70, brightness: 0.72).opacity(0.25),
                     Color.clear
                 ],
                 startPoint: .topLeading,
@@ -63,60 +71,52 @@ struct OnboardingView: View {
             )
             .ignoresSafeArea()
 
-            RadialGradient(
-                colors: [
-                    Color.white.opacity(0.12),
-                    Color.clear
-                ],
-                center: .top,
-                startRadius: 0,
-                endRadius: 320
-            )
-            .ignoresSafeArea()
-
             VStack(spacing: 0) {
-                // Glass progress capsule — steps 1-7 only
+                // Progress bar — steps 1-7
                 if currentStep > 0 && currentStep < 8 {
                     HStack(spacing: 6) {
                         ForEach(1..<8) { i in
                             Capsule()
                                 .fill(i <= currentStep
-                                      ? Color.white
-                                      : Color.white.opacity(0.3))
-                                .frame(
-                                    width: i == currentStep ? 22 : 6,
-                                    height: 6
-                                )
+                                      ? Color.black.opacity(0.75)
+                                      : Color.black.opacity(0.20))
+                                .frame(width: i == currentStep ? 22 : 6, height: 6)
                                 .animation(.spring(response: 0.4, dampingFraction: 0.7), value: currentStep)
+                                .onTapGesture {
+                                    guard i < currentStep else { return }
+                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                        currentStep = i
+                                    }
+                                }
                         }
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 10)
-                    .glassEffect(.regular, in: .capsule)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 9)
+                    .background(Color(white: 0.88), in: Capsule())
                     .padding(.top, 16)
                     .padding(.bottom, 8)
                 }
 
-                TabView(selection: $currentStep) {
-                    ForEach(0..<8) { step in
-                        OnboardingStepView(
-                            step: step,
-                            userName: $userName,
-                            assistantName: $assistantName,
-                            birthday: $birthday,
-                            gender: $gender,
-                            educationSystem: $educationSystem,
-                            gradeLevel: $gradeLevel,
-                            selectedInterests: $selectedInterests,
-                            otherInterest: $otherInterest,
-                            onAdvance: advanceStep,
-                            onComplete: completeOnboarding
-                        )
-                        .tag(step)
-                    }
+                ZStack {
+                    OnboardingStepView(
+                        step: currentStep,
+                        userName: $userName,
+                        assistantName: $assistantName,
+                        birthday: $birthday,
+                        gender: $gender,
+                        educationSystem: $educationSystem,
+                        gradeLevel: $gradeLevel,
+                        selectedInterests: $selectedInterests,
+                        otherInterest: $otherInterest,
+                        onAdvance: advanceStep,
+                        onComplete: completeOnboarding
+                    )
+                    .id(currentStep)
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                        removal: .move(edge: .leading).combined(with: .opacity)
+                    ))
                 }
-                .tabViewStyle(.page(indexDisplayMode: .never))
-                .highPriorityGesture(DragGesture())
             }
         }
         .onAppear {

@@ -119,7 +119,7 @@ enum TimerAlarmSound: String, CaseIterable, Identifiable {
 @MainActor
 class ThemeManager: ObservableObject {
     @AppStorage("selectedTheme") private var selectedThemeRaw: String = AppTheme.system.rawValue
-    @AppStorage("selectedNamedTheme") private var selectedNamedThemeRaw: String = NamedTheme.bayley.rawValue
+    @AppStorage("selectedNamedTheme") private var selectedNamedThemeRaw: String = NamedTheme.buckley.rawValue
     @AppStorage("keepScreenOnDuringFocus") private var keepScreenOnDuringFocusRaw: Bool = true
     @AppStorage("timerAlarmSound") private var timerAlarmSoundRaw: String = TimerAlarmSound.fanfare.rawValue
     @AppStorage("assistantName") var assistantName: String = "Spark"
