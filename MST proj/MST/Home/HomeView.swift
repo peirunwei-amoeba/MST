@@ -77,6 +77,11 @@ struct HomeView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var lastTitleGenerationDate: Date? = nil
 
+    // Daily focus tracking
+    @Environment(FocusTimerBridge.self) private var focusTimerBridge
+    @State private var showDailyFocusEditor = false
+    @State private var dailyFocusJustCompleted = false
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -152,7 +157,7 @@ struct HomeView: View {
                                 }
                             }
                         } else {
-                            Text(aiNavTitle.isEmpty ? "Welcome" : aiNavTitle)
+                            Text(aiNavTitle.isEmpty ? "MST" : aiNavTitle)
                                 .font(.title3.weight(.bold))
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.7)
@@ -164,17 +169,17 @@ struct HomeView: View {
                 }
             }
             .onAppear {
-                let needsTitle = aiNavTitle.isEmpty || aiNavTitle == "Welcome"
-                if needsTitle && !isGeneratingTitle {
+                if aiNavTitle.isEmpty && !isGeneratingTitle {
                     generateAITitle()
                 }
+                themeManager.checkAndResetDailyFocus()
             }
             .onDisappear {
                 titleGenerationTask?.cancel()
             }
             .onChange(of: scenePhase) { _, newPhase in
                 if newPhase == .active {
-                    let stale = aiNavTitle.isEmpty || aiNavTitle == "Welcome"
+                    let stale = aiNavTitle.isEmpty
                     let shouldRefresh: Bool
                     if let lastDate = lastTitleGenerationDate {
                         shouldRefresh = stale || Date().timeIntervalSince(lastDate) > 300
@@ -259,6 +264,22 @@ struct HomeView: View {
                                 }
                             }
                         }
+                }
+            }
+            .sheet(isPresented: $showDailyFocusEditor) {
+                DailyFocusTargetEditorView()
+            }
+            .onChange(of: focusTimerBridge.didEndSession) { _, _ in
+                let elapsed = focusTimerBridge.lastSessionElapsedSeconds
+                focusTimerBridge.lastSessionElapsedSeconds = 0
+                guard elapsed > 0 else { return }
+                let wasAlreadyCompleted = themeManager.todayFocusProgress >= 1.0
+                themeManager.addFocusSeconds(elapsed)
+                if !wasAlreadyCompleted && themeManager.todayFocusProgress >= 1.0 {
+                    dailyFocusJustCompleted = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        dailyFocusJustCompleted = false
+                    }
                 }
             }
             .sheet(item: $showingMilestoneCompletion) { habit in
@@ -346,12 +367,21 @@ struct HomeView: View {
 
             // Horizontal scroll of habit cards
             Group {
-                if activeHabits.isEmpty {
+                if activeHabits.isEmpty && !themeManager.dailyFocusTargetEnabled {
                     emptyHabitCard
                         .transition(.opacity.combined(with: .scale(scale: 0.95)))
                 } else {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 12) {
+                            if themeManager.dailyFocusTargetEnabled {
+                                DailyFocusCard(
+                                    progress: themeManager.todayFocusProgress,
+                                    todayMinutes: themeManager.todayFocusSeconds / 60,
+                                    targetMinutes: themeManager.dailyFocusTargetMinutes,
+                                    isJustCompleted: dailyFocusJustCompleted,
+                                    onTap: { showDailyFocusEditor = true }
+                                )
+                            }
                             ForEach(activeHabits) { habit in
                                 let isRecentlyCompleted = recentlyCompletedHabitIds.contains(habit.id)
 
@@ -969,9 +999,20 @@ struct HomeView: View {
 
     // MARK: - AI Navigation Title Generation
 
+    private static let fallbackTitles = [
+        "Let's Get to Work!", "Goals Loading...", "Today's Quest Begins",
+        "Task Force Ready", "Crushing It Today", "Mission Possible",
+        "Productivity Unlocked", "Time to Shine!"
+    ]
+
+    private func randomFallbackTitle() -> String {
+        Self.fallbackTitles.randomElement() ?? "Let's Go!"
+    }
+
     private func generateAITitle() {
         guard SystemLanguageModel.default.availability == .available else {
-            aiNavTitle = "Welcome"
+            aiNavTitle = randomFallbackTitle()
+            lastTitleGenerationDate = Date()
             return
         }
 
@@ -1052,7 +1093,7 @@ struct HomeView: View {
                 return
             } catch {
                 await MainActor.run {
-                    if aiNavTitle.isEmpty { aiNavTitle = "Welcome" }
+                    if aiNavTitle.isEmpty { aiNavTitle = randomFallbackTitle() }
                     isGeneratingTitle = false
                     lastTitleGenerationDate = Date()
                 }

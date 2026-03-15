@@ -130,6 +130,12 @@ class ThemeManager: ObservableObject {
     @AppStorage("focusSessionsCompleted") var focusSessionsCompleted: Int = 0
     @AppStorage("focusTotalMinutes") var focusTotalMinutes: Int = 0
 
+    // Daily Focus Target
+    @AppStorage("dailyFocusTargetEnabled") var dailyFocusTargetEnabled: Bool = true
+    @AppStorage("dailyFocusTargetMinutes") var dailyFocusTargetMinutes: Int = 90
+    @AppStorage("lastFocusDateString") private var lastFocusDateString: String = ""
+    @AppStorage("todayFocusSeconds") var todayFocusSeconds: Int = 0
+
     var selectedTheme: AppTheme {
         get { AppTheme(rawValue: selectedThemeRaw) ?? .system }
         set {
@@ -184,6 +190,36 @@ class ThemeManager: ObservableObject {
             timerAlarmSoundRaw = newValue.rawValue
             objectWillChange.send()
         }
+    }
+
+    var todayFocusProgress: Double {
+        guard dailyFocusTargetMinutes > 0 else { return 0 }
+        let targetSeconds = dailyFocusTargetMinutes * 60
+        return Double(todayFocusSeconds) / Double(targetSeconds)
+    }
+
+    func checkAndResetDailyFocus() {
+        let today = Self.todayDateString()
+        if lastFocusDateString != today {
+            lastFocusDateString = today
+            todayFocusSeconds = 0
+        }
+    }
+
+    func addFocusSeconds(_ seconds: Int) {
+        let today = Self.todayDateString()
+        if lastFocusDateString != today {
+            lastFocusDateString = today
+            todayFocusSeconds = 0
+        }
+        todayFocusSeconds += seconds
+        objectWillChange.send()
+    }
+
+    private static func todayDateString() -> String {
+        let df = DateFormatter()
+        df.dateFormat = "yyyy-MM-dd"
+        return df.string(from: Date())
     }
 }
 

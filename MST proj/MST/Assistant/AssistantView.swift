@@ -23,7 +23,6 @@ struct AssistantView: View {
     /// Injected from ContentView so the session persists across sheet open/close.
     let viewModel: AssistantViewModel
 
-    @State private var showOnboarding = false
     @State private var showIconPicker = false
     @State private var showChatDropdown = false
     @FocusState private var inputFocused: Bool
@@ -181,16 +180,6 @@ struct AssistantView: View {
                         }
                 }
             }
-        }
-        .onAppear {
-            if !themeManager.hasCompletedOnboarding {
-                showOnboarding = true
-            }
-        }
-        .sheet(isPresented: $showOnboarding) {
-            AssistantOnboardingView()
-                .presentationBackground(.clear)
-                .interactiveDismissDisabled()
         }
         .sheet(isPresented: $showIconPicker) {
             IconPickerView(selectedIcon: $themeManager.assistantIconName)

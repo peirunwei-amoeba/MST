@@ -66,6 +66,8 @@ final class AssistantViewModel {
         SystemLanguageModel.default.availability == .available
     }
 
+    private var profileWasUpdatedInSession = false
+
     init(modelContext: ModelContext, pointsManager: PointsManager, focusTimerBridge: FocusTimerBridge, themeManager: ThemeManager) {
         self.modelContext = modelContext
         self.pointsManager = pointsManager
@@ -73,6 +75,7 @@ final class AssistantViewModel {
         self.themeManager = themeManager
         loadConversationHistory()
         createSession()
+        seedProfileFromSwiftData()
     }
 
     // MARK: - Multi-Chat Persistence
@@ -168,12 +171,18 @@ final class AssistantViewModel {
         4. When asked about tasks, schedule, or progress, call the relevant tool immediately.
         5. When asked to create or complete items, use the write tools, then confirm what was done.
         6. ONLY use pauseHabitToday for outdoor or physical activity habits (running, cycling, hiking, sports). NEVER suggest pausing study, reading, or work habits. Only pause if the user explicitly says they cannot do an outdoor activity today.
+        7. At the start of each new conversation, call getUserSummary to recall what you know about this user.
+        8. When the user shares personal information (name, age, school, interests, struggles, goals), IMMEDIATELY call updateUserProfile with the relevant section BEFORE responding.
+        9. NEVER replace the entire profile — only update one section at a time using updateUserProfile.
+        10. Update the profile incrementally — one insight per call, the most important one first.
+        11. After updating the profile, continue the conversation naturally without mentioning the update.
 
         Be encouraging about streaks and progress. \
         If asked about weather or location, use those tools. \
         For focus timer, use startFocusTimer. \
+        When the user asks to change a setting (theme, name, alarm, focus goal, etc.), use updateAppSetting immediately. \
         Format responses clearly with markdown so headings, bold, bullets, and code are all visually distinct.
-        \(themeManager.userProfileSummary.isEmpty ? "" : "\nUser profile (from past conversations):\n\(themeManager.userProfileSummary)")
+        \(themeManager.userProfileSummary.isEmpty ? "" : "\nUser profile:\n\(themeManager.userProfileSummary)")
         """
     }
 
@@ -194,7 +203,9 @@ final class AssistantViewModel {
             StartFocusTimerTool(focusTimerBridge: focusTimerBridge, tracker: tracker),
             GetWeatherTool(tracker: tracker),
             GetLocationTool(tracker: tracker),
-            GetUserSummaryTool(themeManager: themeManager, tracker: tracker)
+            GetUserSummaryTool(themeManager: themeManager, tracker: tracker),
+            UpdateUserProfileTool(themeManager: themeManager, tracker: tracker),
+            UpdateAppSettingsTool(themeManager: themeManager, tracker: tracker)
         ]
 
         session = LanguageModelSession(tools: tools) {
@@ -280,6 +291,12 @@ final class AssistantViewModel {
 
         tracker.onCallStarted = nil
         tracker.onCallCompleted = nil
+
+        // Detect if profile was updated this turn
+        if tracker.calls.contains(where: { $0.name == "updateUserProfile" }) {
+            profileWasUpdatedInSession = true
+        }
+
         isGenerating = false
         saveConversationHistory()
     }
@@ -318,6 +335,8 @@ final class AssistantViewModel {
 
     func generateConversationSummary() {
         guard isAvailable else { return }
+        // Don't overwrite structured profile if it was updated via tool this session
+        guard !profileWasUpdatedInSession else { return }
         let userMessages = messages.filter { $0.role == .user }
         guard userMessages.count >= 4 else { return }
 
@@ -379,8 +398,38 @@ final class AssistantViewModel {
             return ("location.fill", "Got location")
         case "getUserSummary":
             return ("person.text.rectangle.fill", "Got user profile")
+        case "updateUserProfile":
+            return ("person.badge.plus.fill", "Updated user profile")
+        case "updateAppSetting":
+            return ("gearshape.fill", "Updated setting")
         default:
             return ("gearshape.fill", "Processed")
         }
+    }
+
+    // MARK: - Profile Seeding
+
+    private func seedProfileFromSwiftData() {
+        guard themeManager.userProfileSummary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        guard let profile = try? modelContext.fetch(FetchDescriptor<UserProfileData>()).first else { return }
+
+        var parts: [String] = []
+        if !profile.name.isEmpty { parts.append(profile.name) }
+
+        let calendar = Calendar.current
+        let age = calendar.dateComponents([.year], from: profile.birthday, to: Date()).year ?? 0
+        if age > 5 && age < 100 { parts.append("\(age) years old") }
+
+        if !profile.gradeLevel.isEmpty { parts.append(profile.gradeLevel) }
+        if !profile.educationSystem.isEmpty { parts.append("studying under \(profile.educationSystem) system") }
+
+        let aboutContent = parts.isEmpty ? "" : parts.joined(separator: ", ") + "."
+        let interestStr = profile.interests.isEmpty ? "" : "Interested in: \(profile.interests.joined(separator: ", "))."
+
+        var seedSummary = "## About\n"
+        seedSummary += aboutContent + (interestStr.isEmpty ? "" : " " + interestStr)
+        seedSummary += "\n\n## Learning Style\n\n## Strengths\n\n## Focus Areas\n\n## Observations\n"
+
+        themeManager.userProfileSummary = seedSummary
     }
 }

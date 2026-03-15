@@ -137,6 +137,9 @@ struct FocusView: View {
     @State private var showTaskPicker: Bool = false
     @State private var exactTimeMinutes: Int = 0
 
+    // Ambient music
+    @State private var ambientEngine = AmbientMusicEngine()
+
     // Completion state
     @State private var showCompletionOverlay: Bool = false
     @State private var totalTimerSeconds: Int = 0
@@ -403,6 +406,23 @@ struct FocusView: View {
                             .clipShape(Circle())
                     }
                     .buttonStyle(FocusGlassButtonStyle())
+
+                    // Mute / unmute ambient music
+                    if ambientEngine.isPlaying {
+                        Button {
+                            ambientEngine.toggleMute()
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        } label: {
+                            Image(systemName: ambientEngine.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(ambientEngine.isMuted ? .secondary : themeManager.accentColor)
+                                .frame(width: 52, height: 52)
+                                .glassEffect(.regular.interactive())
+                                .clipShape(Circle())
+                                .contentTransition(.symbolEffect(.replace))
+                        }
+                        .buttonStyle(FocusGlassButtonStyle())
+                    }
                 }
 
                 // Main start/pause button
@@ -447,6 +467,7 @@ struct FocusView: View {
         // Set the end time for background tracking
         timerEndTime = Date().addingTimeInterval(TimeInterval(remainingSeconds))
 
+        ambientEngine.startMusic()
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
 
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
@@ -510,12 +531,18 @@ struct FocusView: View {
     }
 
     private func resetTimer() {
+        let elapsed = totalTimerSeconds - remainingSeconds
+        if elapsed > 0 {
+            focusTimerBridge.lastSessionElapsedSeconds = elapsed
+            focusTimerBridge.didEndSession.toggle()
+        }
         timer?.invalidate()
         timer = nil
         isRunning = false
         isPaused = false
         timerEndTime = nil
         remainingSeconds = 0
+        ambientEngine.stopMusic()
 
         // Reset to default or task time
         if let task = selectedTask, let duration = task.durationInMinutes {
@@ -540,6 +567,13 @@ struct FocusView: View {
         timer = nil
         isRunning = false
         isPaused = false
+        ambientEngine.stopMusic()
+
+        // Report elapsed to HomeView for daily focus tracking
+        if totalTimerSeconds > 0 {
+            focusTimerBridge.lastSessionElapsedSeconds = totalTimerSeconds
+            focusTimerBridge.didEndSession.toggle()
+        }
 
         // Track focus stats
         themeManager.focusSessionsCompleted += 1

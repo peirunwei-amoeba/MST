@@ -18,4 +18,6 @@ import SwiftUI
 final class FocusTimerBridge {
     var requestedMinutes: Int? = nil
     var shouldAutoStart: Bool = false
+    var lastSessionElapsedSeconds: Int = 0
+    var didEndSession: Bool = false
 }

@@ -33,7 +33,7 @@ struct MSTApp: App {
                     HabitReminderManager.requestNotificationPermission()
                 }
         }
-        .modelContainer(for: [Assignment.self, Project.self, Goal.self, Habit.self, HabitEntry.self, PointsLedger.self, PointsTransaction.self, HabitJourneyEntry.self])
+        .modelContainer(for: [Assignment.self, Project.self, Goal.self, Habit.self, HabitEntry.self, PointsLedger.self, PointsTransaction.self, HabitJourneyEntry.self, UserProfileData.self])
     }
 }
 
@@ -56,6 +56,15 @@ private struct AppRootView: View {
                         userName: themeManager.userName
                     )
                 }
+            }
+            .fullScreenCover(
+                isPresented: Binding(
+                    get: { !themeManager.hasCompletedOnboarding && themeManager.userName.isEmpty },
+                    set: { _ in }
+                )
+            ) {
+                OnboardingView()
+                    .interactiveDismissDisabled()
             }
     }
 }

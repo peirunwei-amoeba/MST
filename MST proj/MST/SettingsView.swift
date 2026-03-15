@@ -15,6 +15,7 @@
 import SwiftUI
 import CoreLocation
 import UIKit
+import SwiftData
 
 struct SettingsView: View {
     @EnvironmentObject private var themeManager: ThemeManager
@@ -113,16 +114,19 @@ struct SettingsView: View {
                     }
                 }
 
+                // Personal Info Section
+                Section("Personal Info") {
+                    NavigationLink {
+                        PersonalInfoEditorViewWrapper()
+                    } label: {
+                        Label("Edit Profile", systemImage: "person.fill")
+                    }
+                }
+
                 // Your Profile Section
-                Section("Your Profile") {
-                    if themeManager.userProfileSummary.isEmpty {
-                        Text("Chat with the AI assistant to build your profile.")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    } else {
-                        Text(themeManager.userProfileSummary)
-                            .font(.subheadline)
-                            .foregroundStyle(.primary)
+                Section("AI Profile") {
+                    NavigationLink("View Profile") {
+                        ProfileDetailView()
                     }
                 }
 
