@@ -47,9 +47,9 @@ struct AssignmentListView: View {
 
     @State private var showingAddSheet = false
     @State private var selectedAssignment: Assignment?
-    @State private var sortOption: SortOption = .dueDate
-    @State private var sortAscending = true
-    @State private var filterOption: FilterOption = .all
+    @AppStorage("assignmentSortOption") private var sortOptionRaw: String = SortOption.dueDate.rawValue
+    @AppStorage("assignmentSortAscending") private var sortAscending = true
+    @AppStorage("assignmentFilterOption") private var filterOptionRaw: String = FilterOption.all.rawValue
     @State private var searchText = ""
 
     // For undo functionality
@@ -143,7 +143,7 @@ struct AssignmentListView: View {
         } description: {
             Text(emptyStateDescription)
         } actions: {
-            if filterOption == .all && searchText.isEmpty {
+            if (FilterOption(rawValue: filterOptionRaw) ?? .all) == .all && searchText.isEmpty {
                 Button {
                     showingAddSheet = true
                 } label: {
@@ -158,7 +158,7 @@ struct AssignmentListView: View {
         if !searchText.isEmpty {
             return "No Results"
         }
-        switch filterOption {
+        switch FilterOption(rawValue: filterOptionRaw) ?? .all {
         case .all: return "No Assignments"
         case .pending: return "No Pending Assignments"
         case .completed: return "No Completed Assignments"
@@ -171,7 +171,7 @@ struct AssignmentListView: View {
         if !searchText.isEmpty {
             return "magnifyingglass"
         }
-        switch filterOption {
+        switch FilterOption(rawValue: filterOptionRaw) ?? .all {
         case .all: return "tray"
         case .pending: return "clock"
         case .completed: return "checkmark.circle"
@@ -184,7 +184,7 @@ struct AssignmentListView: View {
         if !searchText.isEmpty {
             return "No assignments match your search."
         }
-        switch filterOption {
+        switch FilterOption(rawValue: filterOptionRaw) ?? .all {
         case .all: return "Add your first assignment to get started."
         case .pending: return "All assignments are completed!"
         case .completed: return "Complete some assignments to see them here."
@@ -194,19 +194,20 @@ struct AssignmentListView: View {
     }
 
     private var sortMenu: some View {
-        Menu {
+        let currentSort = SortOption(rawValue: sortOptionRaw) ?? .dueDate
+        return Menu {
             ForEach(SortOption.allCases, id: \.self) { option in
                 Button {
-                    if sortOption == option {
+                    if currentSort == option {
                         sortAscending.toggle()
                     } else {
-                        sortOption = option
+                        sortOptionRaw = option.rawValue
                         sortAscending = true
                     }
                 } label: {
                     HStack {
                         Label(option.rawValue, systemImage: option.systemImage)
-                        if sortOption == option {
+                        if currentSort == option {
                             Image(systemName: sortAscending ? "chevron.up" : "chevron.down")
                         }
                     }
@@ -218,21 +219,22 @@ struct AssignmentListView: View {
     }
 
     private var filterMenu: some View {
-        Menu {
+        let currentFilter = FilterOption(rawValue: filterOptionRaw) ?? .all
+        return Menu {
             ForEach(FilterOption.allCases, id: \.self) { option in
                 Button {
-                    filterOption = option
+                    filterOptionRaw = option.rawValue
                 } label: {
                     HStack {
                         Text(option.rawValue)
-                        if filterOption == option {
+                        if currentFilter == option {
                             Image(systemName: "checkmark")
                         }
                     }
                 }
             }
         } label: {
-            Label("Filter", systemImage: filterOption == .all ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill")
+            Label("Filter", systemImage: currentFilter == .all ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill")
         }
     }
 
@@ -259,6 +261,8 @@ struct AssignmentListView: View {
     // MARK: - Computed Properties
 
     private var filteredAndSortedAssignments: [Assignment] {
+        let sortOption = SortOption(rawValue: sortOptionRaw) ?? .dueDate
+        let filterOption = FilterOption(rawValue: filterOptionRaw) ?? .all
         var result = assignments
 
         // Apply search filter

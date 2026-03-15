@@ -80,7 +80,7 @@ struct PointsCapsuleView: View {
                 .aspectRatio(contentMode: .fit)
                 .frame(width: 20, height: 20)
 
-            Text("\(pointsManager.getRemainingPoints(modelContext: modelContext))")
+            Text("\(pointsManager.getTotalPoints(modelContext: modelContext))")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.primary)
                 .contentTransition(.numericText())

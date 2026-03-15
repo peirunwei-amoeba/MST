@@ -164,6 +164,22 @@ struct ConcentricHabitCard: View {
         .opacity(isRecentlyCompleted ? 0.6 : 1.0)
         .scaleEffect(isRecentlyCompleted ? 0.95 : 1.0)
         .animation(.easeOut(duration: 0.3), value: isRecentlyCompleted)
+        .overlay(alignment: .topLeading) {
+            if habit.currentStreak > 1 {
+                HStack(spacing: 2) {
+                    Image(systemName: "flame.fill")
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                    Text("\(habit.currentStreak)")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(.primary)
+                }
+                .padding(.horizontal, 6)
+                .padding(.vertical, 3)
+                .background(.ultraThinMaterial, in: Capsule())
+                .padding(8)
+            }
+        }
     }
 
     // MARK: - Holding Logic

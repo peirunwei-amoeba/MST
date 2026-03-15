@@ -108,6 +108,7 @@ struct FocusView: View {
     @EnvironmentObject private var themeManager: ThemeManager
     @EnvironmentObject private var pointsManager: PointsManager
     @Environment(FocusTimerBridge.self) private var focusTimerBridge
+    @Environment(TimerAlarmEngine.self) private var timerAlarmEngine
 
     // Data queries
     @Query(filter: #Predicate<Assignment> { !$0.isCompleted })
@@ -227,7 +228,6 @@ struct FocusView: View {
                 FocusCompletionOverlay(
                     taskTitle: selectedTask?.title,
                     hasTask: selectedTask != nil,
-                    alarmSound: themeManager.timerAlarmSound,
                     onComplete: {
                         markTaskComplete()
                     },
@@ -541,9 +541,13 @@ struct FocusView: View {
         isRunning = false
         isPaused = false
 
+        // Track focus stats
+        themeManager.focusSessionsCompleted += 1
+        themeManager.focusTotalMinutes += totalTimerSeconds / 60
+
         // Haptic burst and alarm sound
         UINotificationFeedbackGenerator().notificationOccurred(.success)
-        themeManager.timerAlarmSound.playWithVibration()
+        timerAlarmEngine.play(sound: themeManager.timerAlarmSound, withVibration: true)
 
         // Show completion overlay
         withAnimation(.easeInOut(duration: 0.4)) {

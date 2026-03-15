@@ -24,8 +24,10 @@ struct ContentView: View {
     @State private var assistantViewModel: AssistantViewModel?
     @State private var selectedTab: Int = 0
     @State private var showCapsuleOnFocus: Bool = false
+    @Query(filter: #Predicate<Assignment> { !$0.isCompleted }) private var incompleteAssignments: [Assignment]
 
     private var isOnFocusTab: Bool { selectedTab == 1 }
+    private var overdueCount: Int { incompleteAssignments.filter { $0.isOverdue }.count }
 
     var body: some View {
         ZStack {
@@ -34,6 +36,7 @@ struct ContentView: View {
                     .tabItem {
                         Label("Home", systemImage: "house.fill")
                     }
+                    .badge(overdueCount)
                     .tag(0)
 
                 FocusView()
@@ -50,6 +53,9 @@ struct ContentView: View {
             }
             .tint(themeManager.accentColor)
             .preferredColorScheme(themeManager.colorScheme)
+            .onChange(of: selectedTab) { _, _ in
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            }
 
             if !isOnFocusTab {
                 FloatingAIButton(showAssistant: $showAssistant)

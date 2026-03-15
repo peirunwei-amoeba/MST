@@ -28,14 +28,18 @@ struct AddHabitView: View {
     @State private var frequency: HabitFrequency = .daily
     @State private var maxCompletionDays: Int = 60
 
+    @FocusState private var isAnyFieldFocused: Bool
+
     var body: some View {
         NavigationStack {
             Form {
                 Section("Habit Details") {
                     TextField("Title (e.g., Read books)", text: $title)
+                        .focused($isAnyFieldFocused)
 
                     TextField("Description (optional)", text: $habitDescription, axis: .vertical)
                         .lineLimit(2...4)
+                        .focused($isAnyFieldFocused)
                 }
 
                 Section("Goal") {
@@ -107,6 +111,13 @@ struct AddHabitView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Add") { addHabit() }
                         .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+                ToolbarItem(placement: .keyboard) {
+                    HStack {
+                        Spacer()
+                        Button("Done") { isAnyFieldFocused = false }
+                            .fontWeight(.semibold)
+                    }
                 }
             }
         }

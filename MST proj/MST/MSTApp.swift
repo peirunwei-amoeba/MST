@@ -20,6 +20,7 @@ struct MSTApp: App {
     @StateObject private var themeManager = ThemeManager()
     @StateObject private var pointsManager = PointsManager()
     @State private var focusTimerBridge = FocusTimerBridge()
+    @State private var timerAlarmEngine = TimerAlarmEngine()
 
     var body: some Scene {
         WindowGroup {
@@ -27,6 +28,7 @@ struct MSTApp: App {
                 .environmentObject(themeManager)
                 .environmentObject(pointsManager)
                 .environment(focusTimerBridge)
+                .environment(timerAlarmEngine)
                 .onAppear {
                     HabitReminderManager.requestNotificationPermission()
                 }

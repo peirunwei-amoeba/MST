@@ -69,6 +69,13 @@ struct HomeView: View {
     // Scroll position state for preserving position during project completion
     @State private var scrollToProjectsOnComplete = false
 
+    // Undo toast for assignment completion
+    @State private var undoAssignment: Assignment?
+    @State private var showUndoToast = false
+
+    // Universal search
+    @State private var searchText = ""
+
     // Scene phase for refreshing AI title on resume
     @Environment(\.scenePhase) private var scenePhase
     @State private var lastTitleGenerationDate: Date? = nil
@@ -77,6 +84,56 @@ struct HomeView: View {
         NavigationStack {
             ScrollViewReader { proxy in
                 ScrollView {
+                    if !searchText.isEmpty {
+                        // Universal search results
+                        VStack(alignment: .leading, spacing: 0) {
+                            if searchResults.isEmpty {
+                                ContentUnavailableView("No Results", systemImage: "magnifyingglass", description: Text("Nothing matches \"\(searchText)\""))
+                                    .padding()
+                            } else {
+                                ForEach(searchResults) { result in
+                                    Button {
+                                        switch result {
+                                        case .assignment(let a): selectedAssignment = a
+                                        case .habit(let h): selectedHabit = h
+                                        case .project(let p): selectedProject = p
+                                        }
+                                    } label: {
+                                        HStack(spacing: 12) {
+                                            Image(systemName: result.icon)
+                                                .font(.system(size: 18))
+                                                .foregroundStyle(result.color)
+                                                .frame(width: 32)
+
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text(result.title)
+                                                    .font(.body.weight(.medium))
+                                                    .foregroundStyle(.primary)
+                                                Text(result.subtitle)
+                                                    .font(.caption)
+                                                    .foregroundStyle(.secondary)
+                                            }
+
+                                            Spacer()
+
+                                            Image(systemName: "chevron.right")
+                                                .font(.caption.weight(.semibold))
+                                                .foregroundStyle(.tertiary)
+                                        }
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 12)
+                                        .contentShape(Rectangle())
+                                    }
+                                    .buttonStyle(.plain)
+
+                                    Divider().padding(.leading, 60)
+                                }
+                            }
+                        }
+                        .background(.ultraThinMaterial)
+                        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                        .padding()
+                    } else {
                     VStack(spacing: 20) {
                         // AI-generated caption — inline below nav title, above habits
                         if !aiNavSubtitle.isEmpty || isGeneratingTitle {
@@ -104,6 +161,13 @@ struct HomeView: View {
                             .id("projectsSection")
                     }
                     .padding()
+                    }
+                }
+                .refreshable {
+                    titleGenerationTask?.cancel()
+                    aiNavTitle = ""
+                    aiNavSubtitle = ""
+                    generateAITitle()
                 }
                 .onChange(of: recentlyCompletedProjectIds) { oldValue, newValue in
                     // When a project completes, scroll to projects section to maintain position
@@ -144,6 +208,7 @@ struct HomeView: View {
                     .animation(.easeInOut(duration: 0.3), value: aiNavTitle)
                 }
             }
+            .searchable(text: $searchText, prompt: "Search assignments, habits, projects")
             .onAppear {
                 if aiNavTitle.isEmpty && !isGeneratingTitle {
                     generateAITitle()
@@ -261,6 +326,31 @@ struct HomeView: View {
                     }
                 )
             }
+            .overlay(alignment: .bottom) {
+                if showUndoToast {
+                    HStack {
+                        Text("Assignment completed · Undo")
+                            .font(.subheadline)
+                        Spacer()
+                        Button("Undo") {
+                            if let assignment = undoAssignment {
+                                withAnimation(.easeInOut(duration: 0.35)) {
+                                    assignment.toggleCompletion()
+                                }
+                            }
+                            withAnimation { showUndoToast = false }
+                            undoAssignment = nil
+                        }
+                        .font(.subheadline.bold())
+                    }
+                    .padding()
+                    .background(.ultraThinMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .padding(.horizontal)
+                    .padding(.bottom, 8)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
         }
     }
 
@@ -320,6 +410,29 @@ struct HomeView: View {
                                         journeyHabit = habit
                                     }
                                 )
+                                .contextMenu {
+                                    Button {
+                                        if habit.isPausedToday {
+                                            habit.unpauseToday()
+                                        } else {
+                                            habit.pauseForToday()
+                                        }
+                                    } label: {
+                                        Label(habit.isPausedToday ? "Unpause Today" : "Pause Today", systemImage: habit.isPausedToday ? "play.circle" : "pause.circle")
+                                    }
+
+                                    Button {
+                                        selectedHabit = habit
+                                    } label: {
+                                        Label("Edit", systemImage: "pencil")
+                                    }
+
+                                    Button(role: .destructive) {
+                                        modelContext.delete(habit)
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
+                                }
                                 .transition(.asymmetric(
                                     insertion: .identity,
                                     removal: .opacity.combined(with: .scale(scale: 0.9)).combined(with: .offset(y: 10))
@@ -393,6 +506,75 @@ struct HomeView: View {
 
     private var activeHabits: [Habit] {
         habits.filter { !$0.isTerminated || recentlyCompletedHabitIds.contains($0.id) }
+    }
+
+    // MARK: - Search
+
+    enum SearchResult: Identifiable {
+        case assignment(Assignment)
+        case habit(Habit)
+        case project(Project)
+
+        var id: UUID {
+            switch self {
+            case .assignment(let a): return a.id
+            case .habit(let h): return h.id
+            case .project(let p): return p.id
+            }
+        }
+
+        var title: String {
+            switch self {
+            case .assignment(let a): return a.title
+            case .habit(let h): return h.title
+            case .project(let p): return p.title
+            }
+        }
+
+        var subtitle: String {
+            switch self {
+            case .assignment(let a): return a.subject.isEmpty ? "Assignment" : a.subject
+            case .habit(let h): return h.formattedTarget
+            case .project(let p): return p.subject.isEmpty ? "Project" : p.subject
+            }
+        }
+
+        var icon: String {
+            switch self {
+            case .assignment: return "book.fill"
+            case .habit: return "flame.fill"
+            case .project: return "folder.fill"
+            }
+        }
+
+        var color: Color {
+            switch self {
+            case .assignment: return .blue
+            case .habit: return .orange
+            case .project: return .purple
+            }
+        }
+    }
+
+    private var searchResults: [SearchResult] {
+        guard !searchText.isEmpty else { return [] }
+        let query = searchText.lowercased()
+        var results: [SearchResult] = []
+        results += assignments.filter {
+            $0.title.lowercased().contains(query) ||
+            $0.subject.lowercased().contains(query) ||
+            $0.assignmentDescription.lowercased().contains(query)
+        }.map { .assignment($0) }
+        results += habits.filter { !$0.isTerminated }.filter {
+            $0.title.lowercased().contains(query) ||
+            $0.habitDescription.lowercased().contains(query)
+        }.map { .habit($0) }
+        results += projects.filter {
+            $0.title.lowercased().contains(query) ||
+            $0.subject.lowercased().contains(query) ||
+            $0.projectDescription.lowercased().contains(query)
+        }.map { .project($0) }
+        return results
     }
 
     private func completeHabitWithAnimation(_ habit: Habit) {
@@ -498,7 +680,8 @@ struct HomeView: View {
                             onToggleComplete: {
                                 completeAssignmentWithDelay(assignment)
                             },
-                            isRecentlyCompleted: isRecentlyCompleted
+                            isRecentlyCompleted: isRecentlyCompleted,
+                            onDelete: { modelContext.delete(assignment) }
                         )
                         .opacity(isRecentlyCompleted ? 0.6 : 1.0)
                         .transition(.asymmetric(
@@ -627,6 +810,18 @@ struct HomeView: View {
 
             // Award points
             pointsManager.awardAssignmentPoints(assignment: assignment, modelContext: modelContext)
+
+            // Show undo toast
+            undoAssignment = assignment
+            withAnimation {
+                showUndoToast = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+                withAnimation {
+                    showUndoToast = false
+                }
+                undoAssignment = nil
+            }
 
             // Remove from visible list after 1 second, then fade out
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
@@ -1200,6 +1395,7 @@ struct ConcentricAssignmentRow: View {
     let onTap: () -> Void
     let onToggleComplete: () -> Void
     var isRecentlyCompleted: Bool = false
+    var onDelete: (() -> Void)? = nil
 
     @EnvironmentObject private var themeManager: ThemeManager
     @State private var animatingCheckmark = false
@@ -1285,6 +1481,17 @@ struct ConcentricAssignmentRow: View {
                                 .clipShape(Capsule())
                         }
 
+                        // Due Today pill
+                        if assignment.isDueToday && !assignment.isCompleted {
+                            Text("Today")
+                                .font(.caption2.weight(.semibold))
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3)
+                                .background(Color.orange.opacity(0.18))
+                                .foregroundStyle(.orange)
+                                .clipShape(Capsule())
+                        }
+
                         // Due date
                         HStack(spacing: 3) {
                             Image(systemName: "clock")
@@ -1307,6 +1514,35 @@ struct ConcentricAssignmentRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .overlay(
+            Group {
+                if assignment.isOverdue && !assignment.isCompleted {
+                    RoundedRectangle(cornerRadius: 16)
+                        .strokeBorder(Color.red.opacity(0.35), lineWidth: 1)
+                }
+            }
+        )
+        .contextMenu {
+            Button {
+                onToggleComplete()
+            } label: {
+                Label(assignment.isCompleted ? "Mark Incomplete" : "Complete", systemImage: assignment.isCompleted ? "arrow.uturn.backward" : "checkmark")
+            }
+
+            Button {
+                onTap()
+            } label: {
+                Label("Edit", systemImage: "pencil")
+            }
+
+            if let onDelete {
+                Button(role: .destructive) {
+                    onDelete()
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+            }
+        }
     }
 
     private var relativeDueDate: String {

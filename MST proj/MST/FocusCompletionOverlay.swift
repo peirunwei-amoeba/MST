@@ -17,10 +17,10 @@ import AVFoundation
 
 struct FocusCompletionOverlay: View {
     @EnvironmentObject private var themeManager: ThemeManager
+    @Environment(TimerAlarmEngine.self) private var timerAlarmEngine
 
     let taskTitle: String?
     let hasTask: Bool
-    let alarmSound: TimerAlarmSound
     let onComplete: () -> Void
     let onDismiss: () -> Void
 
@@ -257,7 +257,7 @@ struct FocusCompletionOverlay: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             let notificationFeedback = UINotificationFeedbackGenerator()
             notificationFeedback.notificationOccurred(.success)
-            alarmSound.play()
+            timerAlarmEngine.play(sound: themeManager.timerAlarmSound, withVibration: false)
         }
 
         // FIRST: Show filled checkmark (turns green)
@@ -353,20 +353,20 @@ struct FocusCompletionOverlay: View {
     FocusCompletionOverlay(
         taskTitle: "Read 30 pages",
         hasTask: true,
-        alarmSound: .fanfare,
         onComplete: {},
         onDismiss: {}
     )
     .environmentObject(ThemeManager())
+    .environment(TimerAlarmEngine())
 }
 
 #Preview("No Task") {
     FocusCompletionOverlay(
         taskTitle: nil,
         hasTask: false,
-        alarmSound: .fanfare,
         onComplete: {},
         onDismiss: {}
     )
     .environmentObject(ThemeManager())
+    .environment(TimerAlarmEngine())
 }

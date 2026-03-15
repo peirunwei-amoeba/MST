@@ -19,19 +19,16 @@ import SwiftData
 final class PointsLedger {
     @Attribute(.unique) var id: UUID
     var totalPointsEarned: Int
-    var totalPointsSpent: Int
 
-    var remainingPoints: Int {
-        totalPointsEarned - totalPointsSpent
+    var totalPoints: Int {
+        totalPointsEarned
     }
 
     init(
         id: UUID = UUID(),
-        totalPointsEarned: Int = 0,
-        totalPointsSpent: Int = 0
+        totalPointsEarned: Int = 0
     ) {
         self.id = id
         self.totalPointsEarned = totalPointsEarned
-        self.totalPointsSpent = totalPointsSpent
     }
 }

@@ -188,7 +188,7 @@ class PointsManager: ObservableObject {
         return ledger
     }
 
-    func getRemainingPoints(modelContext: ModelContext) -> Int {
-        getOrCreateLedger(modelContext: modelContext).remainingPoints
+    func getTotalPoints(modelContext: ModelContext) -> Int {
+        getOrCreateLedger(modelContext: modelContext).totalPoints
     }
 }

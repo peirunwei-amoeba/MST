@@ -72,6 +72,18 @@ struct SettingsView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
+
+                    HStack {
+                        Label("Sessions Completed", systemImage: "checkmark.circle")
+                        Spacer()
+                        Text("\(themeManager.focusSessionsCompleted)").foregroundStyle(.secondary).monospacedDigit()
+                    }
+
+                    HStack {
+                        Label("Total Focus Time", systemImage: "timer")
+                        Spacer()
+                        Text(formattedFocusTime).foregroundStyle(.secondary)
+                    }
                 }
 
                 // AI Assistant Section
@@ -175,6 +187,12 @@ struct SettingsView: View {
         }
     }
 
+    private var formattedFocusTime: String {
+        let h = themeManager.focusTotalMinutes / 60
+        let m = themeManager.focusTotalMinutes % 60
+        return h > 0 ? "\(h)h \(m)m" : "\(m)m"
+    }
+
     private var locationStatusDescription: String {
         switch locationAuthStatus {
         case .authorizedWhenInUse, .authorizedAlways: return "Allowed"
@@ -254,6 +272,7 @@ struct ThemeCard: View {
 
 struct TimerSoundPickerView: View {
     @EnvironmentObject private var themeManager: ThemeManager
+    @Environment(TimerAlarmEngine.self) private var timerAlarmEngine
 
     var body: some View {
         List {
@@ -269,7 +288,7 @@ struct TimerSoundPickerView: View {
 
                         if sound != .none {
                             Button {
-                                sound.play()
+                                timerAlarmEngine.play(sound: sound, withVibration: false)
                             } label: {
                                 Image(systemName: "speaker.wave.2.fill")
                                     .font(.system(size: 14))

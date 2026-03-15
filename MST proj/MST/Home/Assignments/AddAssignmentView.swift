@@ -35,14 +35,18 @@ struct AddAssignmentView: View {
     // For navigating to edit after creation
     var onAssignmentCreated: ((Assignment) -> Void)?
 
+    @FocusState private var isAnyFieldFocused: Bool
+
     var body: some View {
         NavigationStack {
             Form {
                 Section("Assignment Details") {
                     TextField("Title", text: $title)
+                        .focused($isAnyFieldFocused)
 
                     TextField("Description", text: $assignmentDescription, axis: .vertical)
                         .lineLimit(3...6)
+                        .focused($isAnyFieldFocused)
                 }
 
                 Section("Due Date & Time") {
@@ -52,6 +56,7 @@ struct AddAssignmentView: View {
 
                 Section("Organization") {
                     TextField("Subject", text: $subject)
+                        .focused($isAnyFieldFocused)
 
                     Picker("Priority", selection: $priority) {
                         ForEach(Priority.allCases, id: \.self) { priority in
@@ -97,6 +102,7 @@ struct AddAssignmentView: View {
                 Section("Additional") {
                     TextField("Notes", text: $notes, axis: .vertical)
                         .lineLimit(2...4)
+                        .focused($isAnyFieldFocused)
 
                     Toggle("Enable Notifications", isOn: $notificationEnabled)
                 }
@@ -115,6 +121,14 @@ struct AddAssignmentView: View {
                         addAssignment()
                     }
                     .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+
+                ToolbarItem(placement: .keyboard) {
+                    HStack {
+                        Spacer()
+                        Button("Done") { isAnyFieldFocused = false }
+                            .fontWeight(.semibold)
+                    }
                 }
             }
         }

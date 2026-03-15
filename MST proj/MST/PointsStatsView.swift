@@ -62,12 +62,12 @@ struct PointsStatsView: View {
                 .aspectRatio(contentMode: .fit)
                 .frame(width: 56, height: 56)
 
-            Text("\(ledger.remainingPoints)")
+            Text("\(ledger.totalPoints)")
                 .font(.system(size: 48, weight: .bold, design: .rounded))
                 .foregroundStyle(.primary)
                 .contentTransition(.numericText())
 
-            Text("Points Available")
+            Text("Total Points Earned")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
@@ -94,13 +94,6 @@ struct PointsStatsView: View {
                     value: "\(ledger.totalPointsEarned)",
                     icon: "arrow.up.circle.fill",
                     color: .green
-                )
-
-                overviewItem(
-                    title: "Total Spent",
-                    value: "\(ledger.totalPointsSpent)",
-                    icon: "arrow.down.circle.fill",
-                    color: .orange
                 )
             }
         }

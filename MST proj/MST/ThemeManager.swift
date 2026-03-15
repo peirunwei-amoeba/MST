@@ -14,7 +14,6 @@
 
 import SwiftUI
 import Combine
-import AudioToolbox
 
 enum AppTheme: String, CaseIterable, Identifiable {
     case system = "System"
@@ -115,41 +114,6 @@ enum TimerAlarmSound: String, CaseIterable, Identifiable {
     case update = "Update"
 
     var id: String { rawValue }
-
-    /// System sound ID for each tone
-    var systemSoundID: SystemSoundID {
-        switch self {
-        case .none: return 0
-        case .bloom: return 1334
-        case .calypso: return 1335
-        case .chooChoo: return 1336
-        case .descent: return 1337
-        case .fanfare: return 1338
-        case .ladder: return 1339
-        case .minuet: return 1340
-        case .newsFlash: return 1341
-        case .noir: return 1342
-        case .sherwoodForest: return 1343
-        case .spell: return 1344
-        case .suspense: return 1345
-        case .telegraph: return 1346
-        case .tiptoes: return 1347
-        case .typewriters: return 1348
-        case .update: return 1349
-        }
-    }
-
-    /// Play the alarm sound without vibration (for preview)
-    func play() {
-        guard self != .none else { return }
-        AudioServicesPlaySystemSound(systemSoundID)
-    }
-
-    /// Play the alarm sound with vibration (for timer completion)
-    func playWithVibration() {
-        guard self != .none else { return }
-        AudioServicesPlayAlertSound(systemSoundID)
-    }
 }
 
 @MainActor
@@ -163,6 +127,8 @@ class ThemeManager: ObservableObject {
     @AppStorage("userName") var userName: String = ""
     @AppStorage("hasCompletedOnboarding") var hasCompletedOnboarding: Bool = false
     @AppStorage("userProfileSummary") var userProfileSummary: String = ""
+    @AppStorage("focusSessionsCompleted") var focusSessionsCompleted: Int = 0
+    @AppStorage("focusTotalMinutes") var focusTotalMinutes: Int = 0
 
     var selectedTheme: AppTheme {
         get { AppTheme(rawValue: selectedThemeRaw) ?? .system }
