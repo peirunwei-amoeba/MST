@@ -73,144 +73,99 @@ struct HomeView: View {
     @State private var undoAssignment: Assignment?
     @State private var showUndoToast = false
 
-    // Universal search
-    @State private var searchText = ""
-
     // Scene phase for refreshing AI title on resume
     @Environment(\.scenePhase) private var scenePhase
     @State private var lastTitleGenerationDate: Date? = nil
 
     var body: some View {
         NavigationStack {
-            ScrollViewReader { proxy in
-                ScrollView {
-                    if !searchText.isEmpty {
-                        // Universal search results
-                        VStack(alignment: .leading, spacing: 0) {
-                            if searchResults.isEmpty {
-                                ContentUnavailableView("No Results", systemImage: "magnifyingglass", description: Text("Nothing matches \"\(searchText)\""))
-                                    .padding()
-                            } else {
-                                ForEach(searchResults) { result in
-                                    Button {
-                                        switch result {
-                                        case .assignment(let a): selectedAssignment = a
-                                        case .habit(let h): selectedHabit = h
-                                        case .project(let p): selectedProject = p
-                                        }
-                                    } label: {
-                                        HStack(spacing: 12) {
-                                            Image(systemName: result.icon)
-                                                .font(.system(size: 18))
-                                                .foregroundStyle(result.color)
-                                                .frame(width: 32)
-
-                                            VStack(alignment: .leading, spacing: 2) {
-                                                Text(result.title)
-                                                    .font(.body.weight(.medium))
-                                                    .foregroundStyle(.primary)
-                                                Text(result.subtitle)
-                                                    .font(.caption)
-                                                    .foregroundStyle(.secondary)
-                                            }
-
-                                            Spacer()
-
-                                            Image(systemName: "chevron.right")
-                                                .font(.caption.weight(.semibold))
-                                                .foregroundStyle(.tertiary)
-                                        }
-                                        .padding(.horizontal, 16)
-                                        .padding(.vertical, 12)
-                                        .contentShape(Rectangle())
+            ZStack {
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        VStack(spacing: 20) {
+                            // AI-generated caption — inline below nav title, above habits
+                            if !aiNavSubtitle.isEmpty || isGeneratingTitle {
+                                Group {
+                                    if !aiNavSubtitle.isEmpty {
+                                        Text(aiNavSubtitle)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                            .padding(.horizontal, 4)
+                                            .transition(.opacity.combined(with: .move(edge: .top)))
                                     }
-                                    .buttonStyle(.plain)
-
-                                    Divider().padding(.leading, 60)
                                 }
+                                .animation(.easeInOut(duration: 0.4), value: aiNavSubtitle)
                             }
+
+                            // Habits section (at the top)
+                            habitsSection
+
+                            // Upcoming assignments section
+                            assignmentSection
+
+                            // Projects section
+                            projectSection
+                                .id("projectsSection")
                         }
-                        .background(.ultraThinMaterial)
-                        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                         .padding()
-                    } else {
-                    VStack(spacing: 20) {
-                        // AI-generated caption — inline below nav title, above habits
-                        if !aiNavSubtitle.isEmpty || isGeneratingTitle {
-                            Group {
-                                if !aiNavSubtitle.isEmpty {
-                                    Text(aiNavSubtitle)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                        .padding(.horizontal, 4)
-                                        .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
+                    .refreshable {
+                        titleGenerationTask?.cancel()
+                        aiNavTitle = ""
+                        aiNavSubtitle = ""
+                        generateAITitle()
+                    }
+                    .onChange(of: recentlyCompletedProjectIds) { oldValue, newValue in
+                        // When a project completes, scroll to projects section to maintain position
+                        if newValue.count > oldValue.count {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    proxy.scrollTo("projectsSection", anchor: .top)
                                 }
                             }
-                            .animation(.easeInOut(duration: 0.4), value: aiNavSubtitle)
-                        }
-
-                        // Habits section (at the top)
-                        habitsSection
-
-                        // Upcoming assignments section
-                        assignmentSection
-
-                        // Projects section
-                        projectSection
-                            .id("projectsSection")
-                    }
-                    .padding()
-                    }
-                }
-                .refreshable {
-                    titleGenerationTask?.cancel()
-                    aiNavTitle = ""
-                    aiNavSubtitle = ""
-                    generateAITitle()
-                }
-                .onChange(of: recentlyCompletedProjectIds) { oldValue, newValue in
-                    // When a project completes, scroll to projects section to maintain position
-                    if newValue.count > oldValue.count {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                proxy.scrollTo("projectsSection", anchor: .top)
-                            }
                         }
                     }
                 }
+
             }
             .background(themeManager.backgroundColor)
-            .navigationTitle(aiNavTitle.isEmpty ? "Welcome" : aiNavTitle)
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     Group {
                         if aiNavTitle.isEmpty && isGeneratingTitle {
                             // Loading dots while title generates
-                            HStack(spacing: 4) {
+                            HStack(spacing: 6) {
                                 ForEach(0..<3, id: \.self) { i in
                                     Circle()
                                         .fill(Color.secondary.opacity(0.5))
-                                        .frame(width: 4, height: 4)
-                                        .scaleEffect(isGeneratingTitle ? 1.2 : 0.8)
-                                        .animation(.easeInOut(duration: 0.5).repeatForever().delay(Double(i) * 0.15), value: isGeneratingTitle)
+                                        .frame(width: 5, height: 5)
+                                        .scaleEffect(isGeneratingTitle ? 1.3 : 0.7)
+                                        .animation(
+                                            .easeInOut(duration: 0.55)
+                                            .repeatForever(autoreverses: true)
+                                            .delay(Double(i) * 0.18),
+                                            value: isGeneratingTitle
+                                        )
                                 }
                             }
                         } else {
                             Text(aiNavTitle.isEmpty ? "Welcome" : aiNavTitle)
-                                .font(navTitleFont(for: aiNavTitle.isEmpty ? "Welcome" : aiNavTitle))
+                                .font(.title3.weight(.bold))
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.7)
-                                .transition(.opacity)
+                                .transition(.opacity.combined(with: .scale(scale: 0.95)))
                         }
                     }
                     .animation(.easeInOut(duration: 0.3), value: aiNavTitle)
+                    .animation(.easeInOut(duration: 0.3), value: isGeneratingTitle)
                 }
             }
-            .searchable(text: $searchText, prompt: "Search assignments, habits, projects")
             .onAppear {
-                if aiNavTitle.isEmpty && !isGeneratingTitle {
+                let needsTitle = aiNavTitle.isEmpty || aiNavTitle == "Welcome"
+                if needsTitle && !isGeneratingTitle {
                     generateAITitle()
                 }
             }
@@ -219,12 +174,12 @@ struct HomeView: View {
             }
             .onChange(of: scenePhase) { _, newPhase in
                 if newPhase == .active {
-                    // Regenerate title if app resumes after 5+ minutes
+                    let stale = aiNavTitle.isEmpty || aiNavTitle == "Welcome"
                     let shouldRefresh: Bool
                     if let lastDate = lastTitleGenerationDate {
-                        shouldRefresh = Date().timeIntervalSince(lastDate) > 300
+                        shouldRefresh = stale || Date().timeIntervalSince(lastDate) > 300
                     } else {
-                        shouldRefresh = !isGeneratingTitle && aiNavTitle.isEmpty
+                        shouldRefresh = stale || !isGeneratingTitle
                     }
                     if shouldRefresh && !isGeneratingTitle {
                         generateAITitle()
@@ -506,75 +461,6 @@ struct HomeView: View {
 
     private var activeHabits: [Habit] {
         habits.filter { !$0.isTerminated || recentlyCompletedHabitIds.contains($0.id) }
-    }
-
-    // MARK: - Search
-
-    enum SearchResult: Identifiable {
-        case assignment(Assignment)
-        case habit(Habit)
-        case project(Project)
-
-        var id: UUID {
-            switch self {
-            case .assignment(let a): return a.id
-            case .habit(let h): return h.id
-            case .project(let p): return p.id
-            }
-        }
-
-        var title: String {
-            switch self {
-            case .assignment(let a): return a.title
-            case .habit(let h): return h.title
-            case .project(let p): return p.title
-            }
-        }
-
-        var subtitle: String {
-            switch self {
-            case .assignment(let a): return a.subject.isEmpty ? "Assignment" : a.subject
-            case .habit(let h): return h.formattedTarget
-            case .project(let p): return p.subject.isEmpty ? "Project" : p.subject
-            }
-        }
-
-        var icon: String {
-            switch self {
-            case .assignment: return "book.fill"
-            case .habit: return "flame.fill"
-            case .project: return "folder.fill"
-            }
-        }
-
-        var color: Color {
-            switch self {
-            case .assignment: return .blue
-            case .habit: return .orange
-            case .project: return .purple
-            }
-        }
-    }
-
-    private var searchResults: [SearchResult] {
-        guard !searchText.isEmpty else { return [] }
-        let query = searchText.lowercased()
-        var results: [SearchResult] = []
-        results += assignments.filter {
-            $0.title.lowercased().contains(query) ||
-            $0.subject.lowercased().contains(query) ||
-            $0.assignmentDescription.lowercased().contains(query)
-        }.map { .assignment($0) }
-        results += habits.filter { !$0.isTerminated }.filter {
-            $0.title.lowercased().contains(query) ||
-            $0.habitDescription.lowercased().contains(query)
-        }.map { .habit($0) }
-        results += projects.filter {
-            $0.title.lowercased().contains(query) ||
-            $0.subject.lowercased().contains(query) ||
-            $0.projectDescription.lowercased().contains(query)
-        }.map { .project($0) }
-        return results
     }
 
     private func completeHabitWithAnimation(_ habit: Habit) {
@@ -1160,10 +1046,17 @@ struct HomeView: View {
                     try? await Task.sleep(nanoseconds: 40_000_000)
                 }
 
+            } catch is CancellationError {
+                // Task was cancelled (e.g. tab switch) — don't overwrite title with "Welcome"
+                await MainActor.run { isGeneratingTitle = false }
+                return
             } catch {
                 await MainActor.run {
                     if aiNavTitle.isEmpty { aiNavTitle = "Welcome" }
+                    isGeneratingTitle = false
+                    lastTitleGenerationDate = Date()
                 }
+                return
             }
 
             await MainActor.run {
