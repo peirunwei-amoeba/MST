@@ -23,8 +23,8 @@ struct IconPickerView: View {
     // Common SF symbols for an AI assistant
     private let allSymbols: [(category: String, symbols: [String])] = [
         ("AI & Tech", [
-            "sparkles", "wand.and.stars", "bubbles.and.sparkles", "brain",
-            "brain.head.profile", "cpu", "cpu.fill", "network", "infinity",
+            "sparkles", "wand.and.stars", "bubble.left.and.bubble.right.fill", "brain",
+            "cpu", "cpu.fill", "network", "infinity",
             "bolt.fill", "bolt.circle.fill", "antenna.radiowaves.left.and.right",
             "microchip", "terminal.fill", "chevron.left.forwardslash.chevron.right"
         ]),
@@ -34,14 +34,14 @@ struct IconPickerView: View {
             "flame.fill", "globe.americas.fill", "globe.europe.africa.fill"
         ]),
         ("People & Mind", [
-            "person.fill", "person.circle.fill", "figure.mind.and.body",
+            "person.fill", "person.circle.fill", "figure.walk",
             "figure.wave", "figure.run", "hand.raised.fill", "hands.clap.fill",
             "heart.fill", "heart.circle.fill", "face.smiling.fill", "mustache.fill"
         ]),
         ("Nature", [
             "leaf.fill", "tree.fill", "pawprint.fill", "hare.fill",
             "bird.fill", "fish.fill", "ant.fill", "ladybug.fill",
-            "flower.fill", "drop.fill", "snowflake"
+            "seal.fill", "drop.fill", "snowflake"
         ]),
         ("Learning", [
             "graduationcap.fill", "books.vertical.fill", "book.fill",
@@ -51,7 +51,7 @@ struct IconPickerView: View {
         ("Music & Fun", [
             "music.note", "music.mic", "headphones", "gamecontroller.fill",
             "dice.fill", "theatermasks.fill", "popcorn.fill", "camera.fill",
-            "photo.artframe", "paintbrush.fill"
+            "photo.on.rectangle", "paintbrush.fill"
         ]),
         ("Productivity", [
             "checkmark.circle.fill", "list.bullet.clipboard.fill", "calendar",

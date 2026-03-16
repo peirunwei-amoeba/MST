@@ -423,6 +423,7 @@ struct ProjectRowView: View {
                                 .contentTransition(.symbolEffect(.replace.magic(fallback: .replace)))
                                 .scaleEffect(isAnimating ? 1.35 : 1.0)
                                 .rotationEffect(.degrees(isAnimating ? 10 : 0))
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                         .disabled(!canToggle(index, in: goals))

@@ -402,6 +402,7 @@ struct FocusView: View {
                             .font(.system(size: 18, weight: .semibold))
                             .foregroundStyle(.primary)
                             .frame(width: 52, height: 52)
+                            .contentShape(Circle())
                             .glassEffect(.regular.interactive())
                             .clipShape(Circle())
                     }
@@ -417,6 +418,7 @@ struct FocusView: View {
                                 .font(.system(size: 16, weight: .semibold))
                                 .foregroundStyle(ambientEngine.isMuted ? .secondary : themeManager.accentColor)
                                 .frame(width: 52, height: 52)
+                                .contentShape(Circle())
                                 .glassEffect(.regular.interactive())
                                 .clipShape(Circle())
                                 .contentTransition(.symbolEffect(.replace))

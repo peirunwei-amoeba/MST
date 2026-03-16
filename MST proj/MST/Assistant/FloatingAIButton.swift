@@ -33,6 +33,7 @@ struct FloatingAIButton: View {
                             .font(.system(size: 24, weight: .semibold))
                             .foregroundStyle(themeManager.accentColor)
                             .frame(width: 60, height: 60)
+                            .contentShape(Circle())
                             .glassEffect(.regular.interactive(), in: Circle())
                     }
                     .buttonStyle(GlassButtonStyle())

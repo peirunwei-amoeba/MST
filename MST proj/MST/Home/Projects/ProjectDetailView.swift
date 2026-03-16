@@ -331,6 +331,7 @@ struct GoalColumnView: View {
                     .contentTransition(.symbolEffect(.replace.magic(fallback: .replace)))
                     .scaleEffect(animatingCheckmark ? 1.35 : 1.0)
                     .rotationEffect(.degrees(animatingCheckmark ? 10 : 0))
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .disabled(!isEnabled)

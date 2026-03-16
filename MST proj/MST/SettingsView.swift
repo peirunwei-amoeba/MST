@@ -20,6 +20,7 @@ import SwiftData
 struct SettingsView: View {
     @EnvironmentObject private var themeManager: ThemeManager
     @State private var showingChangelog = false
+    @State private var showingIconPicker = false
     @State private var locationAuthStatus: CLAuthorizationStatus = CLLocationManager().authorizationStatus
 
     var body: some View {
@@ -112,6 +113,19 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                         .frame(width: 120)
                     }
+
+                    Button {
+                        showingIconPicker = true
+                    } label: {
+                        HStack {
+                            Label("Assistant Icon", systemImage: themeManager.assistantIconName)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        }
+                        .foregroundStyle(.primary)
+                    }
                 }
 
                 // Personal Info Section
@@ -184,6 +198,11 @@ struct SettingsView: View {
             .navigationTitle("Settings")
             .sheet(isPresented: $showingChangelog) {
                 ChangelogView()
+            }
+            .sheet(isPresented: $showingIconPicker) {
+                IconPickerView(selectedIcon: $themeManager.assistantIconName)
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
             }
             .onAppear {
                 locationAuthStatus = CLLocationManager().authorizationStatus
@@ -298,6 +317,7 @@ struct TimerSoundPickerView: View {
                                     .font(.system(size: 14))
                                     .foregroundStyle(themeManager.accentColor.opacity(0.7))
                                     .frame(width: 32, height: 32)
+                                    .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
                         }

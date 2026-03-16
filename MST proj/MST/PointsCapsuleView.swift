@@ -57,6 +57,7 @@ struct PointsCapsuleView: View {
                 width: isExpanded ? 120 : 80,
                 height: isExpanded ? 120 : 36
             )
+            .contentShape(.rect(cornerRadius: cornerRadius))
             .overlay {
                 ZStack {
                     // Compact pill content

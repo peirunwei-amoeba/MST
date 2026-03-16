@@ -28,6 +28,8 @@ final class HabitJourneyEntry {
     var storyText: String
     /// JSON-encoded [String: String] mapping each `!marker` → absolute file path of the generated image.
     var imagePathsJSON: String
+    /// Raw value of `JourneyDividerStyle` shown BEFORE this entry (entry 1's value is ignored).
+    var dividerStyle: String = ""
 
     // MARK: - Computed helpers
 

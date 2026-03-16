@@ -278,6 +278,7 @@ struct AssistantView: View {
                     }
                 }
                 .frame(width: 44, height: 44)
+                .contentShape(Circle())
                 .glassEffect(.regular.interactive(), in: Circle())
                 .contentTransition(.symbolEffect(.replace.magic(fallback: .replace)))
             }

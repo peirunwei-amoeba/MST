@@ -52,6 +52,8 @@ struct AssignmentRowView: View {
                     .contentTransition(.symbolEffect(.replace.magic(fallback: .replace)))
                     .scaleEffect(animatingCheckmark ? 1.35 : 1.0)
                     .rotationEffect(.degrees(animatingCheckmark ? 10 : 0))
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
 

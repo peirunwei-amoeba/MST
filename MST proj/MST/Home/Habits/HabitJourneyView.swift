@@ -70,9 +70,14 @@ struct HabitJourneyView: View {
 
                 ScrollViewReader { proxy in
                     ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 24) {
+                        LazyVStack(alignment: .leading, spacing: 32) {
                             // Past entries
-                            ForEach(habitEntries) { entry in
+                            ForEach(Array(habitEntries.enumerated()), id: \.element.id) { index, entry in
+                                if index > 0 {
+                                    JourneyDividerView(
+                                        style: JourneyDividerStyle(rawValue: entry.dividerStyle) ?? .mountain_pass
+                                    )
+                                }
                                 JourneyEntryView(
                                     entry: entry,
                                     isHighlighted: entry.id == newestEntryId
@@ -256,6 +261,8 @@ struct HabitJourneyView: View {
                     for marker in markers {
                         Task { await autoGenerateImage(for: savedEntry, marker: marker) }
                     }
+                    // Pick divider style for this entry in background (displayed before next entry)
+                    Task { await pickDividerStyle(for: savedEntry, storyText: fullText) }
                 }
             } catch {
                 await MainActor.run {
@@ -267,48 +274,55 @@ struct HabitJourneyView: View {
     }
 
     private func buildStoryPrompt(checkinNumber: Int) -> String {
-        let calendar = Calendar.current
-        let hour = calendar.component(.hour, from: Date())
-        let timeOfDay = hour < 12 ? "morning" : hour < 17 ? "afternoon" : "evening"
-        let dayOfWeek = calendar.weekdaySymbols[calendar.component(.weekday, from: Date()) - 1]
-
-        let habitContext = habit.habitDescription.isEmpty
-            ? "'\(habit.title)'"
-            : "'\(habit.title)' (\(habit.habitDescription))"
-
-        let streakContext = habit.currentStreak > 1
-            ? " They are on a \(habit.currentStreak)-day streak."
-            : ""
-
         let previousStory: String
         if habitEntries.isEmpty {
-            previousStory = "(This is the very first check-in. Start an inspiring new story.)"
+            previousStory = "(This is the very beginning of the quest. Begin the epic adventure — introduce the protagonist setting out on their legendary journey to seek the Grand Master of \(habit.title), who dwells in a mysterious realm beyond treacherous mountains, enchanted forests, and crystalline lakes.)"
         } else {
-            let allEntries = habitEntries.map { "Day \($0.checkinNumber): \($0.storyText)" }.joined(separator: "\n\n")
-            previousStory = allEntries
+            previousStory = habitEntries.map { $0.storyText }.joined(separator: "\n\n")
         }
 
+        let streakContext = habit.currentStreak > 1
+            ? "After \(habit.currentStreak) days of treacherous travel, "
+            : ""
+
         return """
-        You are writing a vivid, emotionally resonant personal journal story about someone's journey with their \(habitContext) habit.
+        You are writing an epic fantasy adventure story. The protagonist is on a legendary quest to find the Grand Master of \(habit.title), who dwells in a mysterious realm beyond treacherous mountains, enchanted forests, and crystalline lakes.
 
-        Context:
-        - This is check-in #\(checkinNumber)
-        - It is \(dayOfWeek) \(timeOfDay)\(streakContext)
-        - Total days completed: \(habit.completedDaysCount)
+        \(streakContext)the journey continues.
 
-        Previous story entries:
+        Previous story:
         \(previousStory)
 
         Instructions:
-        1. Write ONE paragraph (4–6 sentences) continuing this journey from the previous entries.
-        2. Include vivid sensory details, emotions, challenges, and moments of growth.
-        3. Make it personal and inspiring. Reference the streak and progress naturally.
-        4. At EXACTLY ONE natural point in the narrative, embed an image scene placeholder using the format: !word_word_word
-           (2–4 descriptive words joined by underscores, no spaces, no special characters, lowercase only)
-           Example: !morning_mist_over_lake or !determined_runner_sunrise
-        5. The placeholder should describe a visual scene that perfectly captures that story moment.
-        6. Write ONLY the paragraph — no titles, no labels, no extra commentary.
+        1. Write ONE passage (4–6 sentences) continuing the adventure seamlessly from where it left off.
+        2. Describe vivid landscapes, creatures, challenges, discoveries, or dramatic moments.
+        3. Continue any cliffhanger or atmosphere from the previous passage naturally.
+        4. Embed 1–2 image scene placeholders using !snake_case_name format at vivid visual moments:
+           - Place them WITHIN the narrative, between sentences or after a descriptive phrase
+           - Never at the very start or end of the passage
+           - Use descriptive, specific names: !misty_mountain_peak, !glowing_forest_canopy, !rushing_waterfall_mist
+           - Choose moments where a reader would most want to SEE the scene
+        5. NEVER write: "Day X", habit names, check-in numbers, "streak", "habit", "today you completed", or any meta-commentary.
+        6. Write ONLY the story passage — no titles, no labels, no extra commentary.
         """
+    }
+
+    // MARK: - Divider Style Picker
+
+    private func pickDividerStyle(for entry: HabitJourneyEntry, storyText: String) async {
+        guard SystemLanguageModel.default.availability == .available else { return }
+        let styleNames = JourneyDividerStyle.allCases.map { "\($0.rawValue): \($0.title)" }.joined(separator: ", ")
+        let prompt = "Story passage: \"\(storyText.prefix(300))\"\n\nChoose the best matching divider style from: \(styleNames)\nReply with ONLY the rawValue (snake_case)."
+        let session = LanguageModelSession()
+        if let response = try? await session.respond(to: prompt) {
+            let raw = response.content.trimmingCharacters(in: .whitespacesAndNewlines)
+            if JourneyDividerStyle(rawValue: raw) != nil {
+                await MainActor.run {
+                    entry.dividerStyle = raw
+                    try? modelContext.save()
+                }
+            }
+        }
     }
 
     // MARK: - Background Image Generation
@@ -365,51 +379,24 @@ private struct JourneyEntryView: View {
     @State private var appeared = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Entry header
-            HStack {
-                Label("Day \(entry.checkinNumber)", systemImage: "flame.fill")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.orange)
+        // Story segments (text + inline images) — bare flowing text, no card
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(Array(entry.segments.enumerated()), id: \.offset) { _, segment in
+                switch segment {
+                case .text(let t):
+                    Text(t)
+                        .font(.body)
+                        .foregroundStyle(.primary)
+                        .fixedSize(horizontal: false, vertical: true)
 
-                Spacer()
-
-                Text(relativeDate(entry.date))
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
-
-            // Story segments (text + inline images)
-            VStack(alignment: .leading, spacing: 10) {
-                ForEach(Array(entry.segments.enumerated()), id: \.offset) { _, segment in
-                    switch segment {
-                    case .text(let t):
-                        Text(t)
-                            .font(.body)
-                            .foregroundStyle(.primary)
-                            .fixedSize(horizontal: false, vertical: true)
-
-                    case .imageMarker(let marker):
-                        ImageMarkerView(
-                            marker: marker,
-                            entry: entry,
-                            savedURL: entry.savedImageURL(for: marker)
-                        )
-                    }
+                case .imageMarker(let marker):
+                    ImageMarkerView(
+                        marker: marker,
+                        entry: entry,
+                        savedURL: entry.savedImageURL(for: marker)
+                    )
                 }
             }
-        }
-        .padding(16)
-        .background {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(.regularMaterial)
-                .overlay {
-                    if isHighlighted {
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .strokeBorder(.orange.opacity(0.5), lineWidth: 1.5)
-                    }
-                }
-                .shadow(color: .black.opacity(isHighlighted ? 0.08 : 0.04), radius: isHighlighted ? 12 : 6)
         }
         .opacity(appeared ? 1 : 0)
         .offset(y: appeared ? 0 : 12)
@@ -418,12 +405,6 @@ private struct JourneyEntryView: View {
                 appeared = true
             }
         }
-    }
-
-    private func relativeDate(_ date: Date) -> String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: date, relativeTo: Date())
     }
 }
 
@@ -452,16 +433,7 @@ private struct StreamingEntryView: View {
                     .foregroundStyle(.primary)
             }
         }
-        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(.regularMaterial)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .strokeBorder(.purple.opacity(0.3), lineWidth: 1)
-                )
-        }
     }
 }
 
@@ -559,3 +531,102 @@ private struct ImageMarkerView: View {
     }
 }
 
+// MARK: - Journey Divider Style
+
+enum JourneyDividerStyle: String, CaseIterable {
+    case mountain_pass
+    case forest_path
+    case river_crossing
+    case starlit_night
+    case ancient_gate
+    case misty_fog
+    case lightning_storm
+    case underground_cave
+    case desert_wind
+    case enchanted_bridge
+    case frozen_tundra
+    case volcano_crossing
+
+    var title: String {
+        switch self {
+        case .mountain_pass: return "Rocky Mountain Pass"
+        case .forest_path: return "Ancient Forest Path"
+        case .river_crossing: return "Rushing River Crossing"
+        case .starlit_night: return "Starlit Night Sky"
+        case .ancient_gate: return "Sacred Temple Gate"
+        case .misty_fog: return "Misty Valley Fog"
+        case .lightning_storm: return "Crashing Lightning Storm"
+        case .underground_cave: return "Dark Underground Cave"
+        case .desert_wind: return "Howling Desert Wind"
+        case .enchanted_bridge: return "Glowing Enchanted Bridge"
+        case .frozen_tundra: return "Endless Frozen Tundra"
+        case .volcano_crossing: return "Fiery Volcano Crossing"
+        }
+    }
+
+    var sfSymbol: String {
+        switch self {
+        case .mountain_pass: return "mountain.2.fill"
+        case .forest_path: return "tree.fill"
+        case .river_crossing: return "drop.fill"
+        case .starlit_night: return "star.fill"
+        case .ancient_gate: return "building.columns.fill"
+        case .misty_fog: return "cloud.fill"
+        case .lightning_storm: return "bolt.fill"
+        case .underground_cave: return "circle.dotted"
+        case .desert_wind: return "wind"
+        case .enchanted_bridge: return "sparkles"
+        case .frozen_tundra: return "snowflake"
+        case .volcano_crossing: return "flame.fill"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .mountain_pass: return .gray
+        case .forest_path: return .green
+        case .river_crossing: return .blue
+        case .starlit_night: return .indigo
+        case .ancient_gate: return .brown
+        case .misty_fog: return Color.secondary
+        case .lightning_storm: return .yellow
+        case .underground_cave: return .purple
+        case .desert_wind: return .orange
+        case .enchanted_bridge: return .cyan
+        case .frozen_tundra: return .blue
+        case .volcano_crossing: return .red
+        }
+    }
+
+    static var defaultStyle: JourneyDividerStyle { .mountain_pass }
+}
+
+// MARK: - Journey Divider View
+
+private struct JourneyDividerView: View {
+    let style: JourneyDividerStyle
+
+    var body: some View {
+        VStack(spacing: 6) {
+            HStack(spacing: 12) {
+                Rectangle()
+                    .fill(Color.secondary.opacity(0.25))
+                    .frame(height: 1)
+
+                Image(systemName: style.sfSymbol)
+                    .font(.system(size: 16))
+                    .foregroundStyle(style.color)
+
+                Rectangle()
+                    .fill(Color.secondary.opacity(0.25))
+                    .frame(height: 1)
+            }
+
+            Text(style.title)
+                .font(.caption2)
+                .italic()
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 8)
+    }
+}

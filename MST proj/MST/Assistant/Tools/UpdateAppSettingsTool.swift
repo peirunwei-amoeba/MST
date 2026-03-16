@@ -31,11 +31,12 @@ struct UpdateAppSettingsTool: Tool {
     - alarmSound: Timer alarm — "None", "Bloom", "Calypso", "Choo Choo", "Descent", "Fanfare", "Ladder", "Minuet", "News Flash", "Noir", "Sherwood Forest", "Spell", "Suspense", "Telegraph", "Tiptoes", "Typewriters", "Update"
     - dailyFocusEnabled: Enable daily focus goal — "true" or "false"
     - dailyFocusMinutes: Daily focus target in minutes (10–480)
+    - assistantIcon: SF Symbol name for the AI assistant button icon (e.g. "sparkles", "brain", "star.fill")
     """
 
     @Generable
     struct Arguments {
-        @Guide(description: "The setting name to update. One of: userName, assistantName, theme, namedTheme, keepScreenOn, alarmSound, dailyFocusEnabled, dailyFocusMinutes")
+        @Guide(description: "The setting name to update. One of: userName, assistantName, theme, namedTheme, keepScreenOn, alarmSound, dailyFocusEnabled, dailyFocusMinutes, assistantIcon")
         var setting: String
 
         @Guide(description: "The new value for the setting. See tool description for valid values per setting.")
@@ -115,8 +116,14 @@ struct UpdateAppSettingsTool: Tool {
             }
             return "Invalid value '\(value)'. Must be a whole number between 10 and 480."
 
+        case "assistanticon":
+            guard !value.isEmpty else { return "Icon name cannot be empty." }
+            themeManager.assistantIconName = value
+            themeManager.objectWillChange.send()
+            return "Updated assistant icon to '\(value)'"
+
         default:
-            return "Unknown setting '\(setting)'. Available: userName, assistantName, theme, namedTheme, keepScreenOn, alarmSound, dailyFocusEnabled, dailyFocusMinutes"
+            return "Unknown setting '\(setting)'. Available: userName, assistantName, theme, namedTheme, keepScreenOn, alarmSound, dailyFocusEnabled, dailyFocusMinutes, assistantIcon"
         }
     }
 }
