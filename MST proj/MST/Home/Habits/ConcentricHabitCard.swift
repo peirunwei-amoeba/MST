@@ -15,14 +15,31 @@
 import SwiftUI
 import AVFoundation
 
-struct ConcentricHabitCard: View {
+struct ConcentricHabitCard<ContextMenu: View>: View {
     let habit: Habit
     var isRecentlyCompleted: Bool = false
     let onTap: () -> Void
     let onToggleComplete: () -> Void
     var onJourney: (() -> Void)? = nil
+    let contextMenu: () -> ContextMenu
 
     @EnvironmentObject private var themeManager: ThemeManager
+
+    init(
+        habit: Habit,
+        isRecentlyCompleted: Bool = false,
+        onTap: @escaping () -> Void,
+        onToggleComplete: @escaping () -> Void,
+        onJourney: (() -> Void)? = nil,
+        @ViewBuilder contextMenu: @escaping () -> ContextMenu
+    ) {
+        self.habit = habit
+        self.isRecentlyCompleted = isRecentlyCompleted
+        self.onTap = onTap
+        self.onToggleComplete = onToggleComplete
+        self.onJourney = onJourney
+        self.contextMenu = contextMenu
+    }
 
     // Long press animation states
     @State private var isHolding = false
@@ -147,6 +164,7 @@ struct ConcentricHabitCard: View {
                         .buttonStyle(.plain)
                     }
                 }
+                .contextMenu(menuItems: contextMenu)
             }
             .frame(width: 110, height: 170)
             .padding(.vertical, 20)
@@ -299,6 +317,25 @@ struct ConcentricHabitCard: View {
                 timer.invalidate()
             }
         }
+    }
+}
+
+extension ConcentricHabitCard where ContextMenu == EmptyView {
+    init(
+        habit: Habit,
+        isRecentlyCompleted: Bool = false,
+        onTap: @escaping () -> Void,
+        onToggleComplete: @escaping () -> Void,
+        onJourney: (() -> Void)? = nil
+    ) {
+        self.init(
+            habit: habit,
+            isRecentlyCompleted: isRecentlyCompleted,
+            onTap: onTap,
+            onToggleComplete: onToggleComplete,
+            onJourney: onJourney,
+            contextMenu: { EmptyView() }
+        )
     }
 }
 

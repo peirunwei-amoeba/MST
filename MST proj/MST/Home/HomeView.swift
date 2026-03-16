@@ -69,9 +69,6 @@ struct HomeView: View {
     // Scroll position state for preserving position during project completion
     @State private var scrollToProjectsOnComplete = false
 
-    // Undo toast for assignment completion
-    @State private var undoAssignment: Assignment?
-    @State private var showUndoToast = false
 
     // Scene phase for refreshing AI title on resume
     @Environment(\.scenePhase) private var scenePhase
@@ -302,31 +299,6 @@ struct HomeView: View {
                     }
                 )
             }
-            .overlay(alignment: .bottom) {
-                if showUndoToast {
-                    HStack {
-                        Text("Assignment completed · Undo")
-                            .font(.subheadline)
-                        Spacer()
-                        Button("Undo") {
-                            if let assignment = undoAssignment {
-                                withAnimation(.easeInOut(duration: 0.35)) {
-                                    assignment.toggleCompletion()
-                                }
-                            }
-                            withAnimation { showUndoToast = false }
-                            undoAssignment = nil
-                        }
-                        .font(.subheadline.bold())
-                    }
-                    .padding()
-                    .background(.ultraThinMaterial)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .padding(.horizontal)
-                    .padding(.bottom, 8)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
-            }
         }
     }
 
@@ -377,7 +349,7 @@ struct HomeView: View {
                                 DailyFocusCard(
                                     progress: themeManager.todayFocusProgress,
                                     todayMinutes: themeManager.todayFocusSeconds / 60,
-                                    targetMinutes: themeManager.dailyFocusTargetMinutes,
+                                    targetMinutes: themeManager.effectiveTodayTargetMinutes,
                                     isJustCompleted: dailyFocusJustCompleted,
                                     onTap: { showDailyFocusEditor = true }
                                 )
@@ -394,8 +366,7 @@ struct HomeView: View {
                                         journeyStartGenerating = false
                                         journeyHabit = habit
                                     }
-                                )
-                                .contextMenu {
+                                ) {
                                     Button {
                                         if habit.isPausedToday {
                                             habit.unpauseToday()
@@ -726,18 +697,6 @@ struct HomeView: View {
 
             // Award points
             pointsManager.awardAssignmentPoints(assignment: assignment, modelContext: modelContext)
-
-            // Show undo toast
-            undoAssignment = assignment
-            withAnimation {
-                showUndoToast = true
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
-                withAnimation {
-                    showUndoToast = false
-                }
-                undoAssignment = nil
-            }
 
             // Remove from visible list after 1 second, then fade out
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
@@ -1451,7 +1410,7 @@ struct ConcentricAssignmentRow: View {
         .overlay(
             Group {
                 if assignment.isOverdue && !assignment.isCompleted {
-                    RoundedRectangle(cornerRadius: 16)
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
                         .strokeBorder(Color.red.opacity(0.35), lineWidth: 1)
                 }
             }

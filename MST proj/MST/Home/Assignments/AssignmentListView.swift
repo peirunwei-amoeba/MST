@@ -52,9 +52,6 @@ struct AssignmentListView: View {
     @AppStorage("assignmentFilterOption") private var filterOptionRaw: String = FilterOption.all.rawValue
     @State private var searchText = ""
 
-    // For undo functionality
-    @State private var recentlyCompletedAssignment: Assignment?
-    @State private var showUndoToast = false
 
     var body: some View {
         NavigationStack {
@@ -90,11 +87,6 @@ struct AssignmentListView: View {
             .sheet(item: $selectedAssignment) { assignment in
                 EditAssignmentView(assignment: assignment)
             }
-            .overlay(alignment: .bottom) {
-                if showUndoToast {
-                    undoToast
-                }
-            }
         }
     }
 
@@ -106,7 +98,9 @@ struct AssignmentListView: View {
                 AssignmentRowView(
                     assignment: assignment,
                     onToggleComplete: {
-                        toggleCompletionWithUndo(assignment)
+                        withAnimation(.easeInOut(duration: 0.35)) {
+                            assignment.toggleCompletion()
+                        }
                     },
                     onTap: {
                         selectedAssignment = assignment
@@ -121,7 +115,9 @@ struct AssignmentListView: View {
                 }
                 .swipeActions(edge: .leading, allowsFullSwipe: true) {
                     Button {
-                        toggleCompletionWithUndo(assignment)
+                        withAnimation(.easeInOut(duration: 0.35)) {
+                            assignment.toggleCompletion()
+                        }
                     } label: {
                         if assignment.isCompleted {
                             Label("Mark Incomplete", systemImage: "arrow.uturn.backward")
@@ -238,26 +234,6 @@ struct AssignmentListView: View {
         }
     }
 
-    private var undoToast: some View {
-        HStack {
-            Text("Marked as complete")
-                .font(.subheadline)
-
-            Spacer()
-
-            Button("Undo") {
-                undoCompletion()
-            }
-            .font(.subheadline.bold())
-        }
-        .padding()
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .padding(.horizontal)
-        .padding(.bottom, 8)
-        .transition(.move(edge: .bottom).combined(with: .opacity))
-    }
-
     // MARK: - Computed Properties
 
     private var filteredAndSortedAssignments: [Assignment] {
@@ -320,41 +296,6 @@ struct AssignmentListView: View {
         modelContext.delete(assignment)
     }
 
-    private func toggleCompletionWithUndo(_ assignment: Assignment) {
-        let wasCompleted = assignment.isCompleted
-
-        withAnimation(.easeInOut(duration: 0.35)) {
-            assignment.toggleCompletion()
-        }
-
-        if !wasCompleted {
-            // Just completed - show undo option
-            recentlyCompletedAssignment = assignment
-            withAnimation {
-                showUndoToast = true
-            }
-
-            // Auto-hide after 4 seconds
-            DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
-                withAnimation {
-                    showUndoToast = false
-                }
-                recentlyCompletedAssignment = nil
-            }
-        }
-    }
-
-    private func undoCompletion() {
-        if let assignment = recentlyCompletedAssignment {
-            withAnimation(.easeInOut(duration: 0.35)) {
-                assignment.toggleCompletion()
-            }
-        }
-        withAnimation {
-            showUndoToast = false
-        }
-        recentlyCompletedAssignment = nil
-    }
 }
 
 #Preview {

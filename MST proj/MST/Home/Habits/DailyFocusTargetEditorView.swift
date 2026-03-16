@@ -20,6 +20,41 @@ struct DailyFocusTargetEditorView: View {
 
     private let presets = [30, 45, 60, 90, 120]
 
+    private struct WeekdayRow {
+        let name: String
+        let getValue: () -> Int
+        let setValue: (Int) -> Void
+    }
+
+    private var weekdayRows: [WeekdayRow] {
+        [
+            WeekdayRow(name: "Monday",    getValue: { themeManager.focusDailyTargetMon }, setValue: { themeManager.focusDailyTargetMon = $0 }),
+            WeekdayRow(name: "Tuesday",   getValue: { themeManager.focusDailyTargetTue }, setValue: { themeManager.focusDailyTargetTue = $0 }),
+            WeekdayRow(name: "Wednesday", getValue: { themeManager.focusDailyTargetWed }, setValue: { themeManager.focusDailyTargetWed = $0 }),
+            WeekdayRow(name: "Thursday",  getValue: { themeManager.focusDailyTargetThu }, setValue: { themeManager.focusDailyTargetThu = $0 }),
+            WeekdayRow(name: "Friday",    getValue: { themeManager.focusDailyTargetFri }, setValue: { themeManager.focusDailyTargetFri = $0 }),
+            WeekdayRow(name: "Saturday",  getValue: { themeManager.focusDailyTargetSat }, setValue: { themeManager.focusDailyTargetSat = $0 }),
+            WeekdayRow(name: "Sunday",    getValue: { themeManager.focusDailyTargetSun }, setValue: { themeManager.focusDailyTargetSun = $0 }),
+        ]
+    }
+
+    private func dayTargetRow(_ name: String, value: Int, onChange: @escaping (Int) -> Void) -> some View {
+        Stepper(
+            value: Binding(get: { value }, set: onChange),
+            in: 0...480,
+            step: 5
+        ) {
+            HStack {
+                Text(name)
+                    .frame(width: 100, alignment: .leading)
+                Spacer()
+                Text(value == 0 ? "Default" : "\(value) min")
+                    .foregroundStyle(value == 0 ? .secondary : .primary)
+                    .monospacedDigit()
+            }
+        }
+    }
+
     var body: some View {
         NavigationStack {
             Form {
@@ -69,6 +104,16 @@ struct DailyFocusTargetEditorView: View {
                 }
 
                 if themeManager.dailyFocusTargetEnabled {
+                    Section {
+                        ForEach(weekdayRows, id: \.name) { row in
+                            dayTargetRow(row.name, value: row.getValue(), onChange: row.setValue)
+                        }
+                    } header: {
+                        Text("Per-Day Targets")
+                    } footer: {
+                        Text("Set to 0 to use the default target above")
+                    }
+
                     Section("Today's Progress") {
                         let todayMin = themeManager.todayFocusSeconds / 60
                         let progress = themeManager.todayFocusProgress
@@ -76,7 +121,7 @@ struct DailyFocusTargetEditorView: View {
                         HStack {
                             Text("Focus Time Today")
                             Spacer()
-                            Text("\(todayMin) / \(themeManager.dailyFocusTargetMinutes) min")
+                            Text("\(todayMin) / \(themeManager.effectiveTodayTargetMinutes) min")
                                 .foregroundStyle(.secondary)
                         }
 

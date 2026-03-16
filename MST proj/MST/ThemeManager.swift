@@ -136,6 +136,15 @@ class ThemeManager: ObservableObject {
     @AppStorage("lastFocusDateString") private var lastFocusDateString: String = ""
     @AppStorage("todayFocusSeconds") var todayFocusSeconds: Int = 0
 
+    // Per-weekday targets (0 = use global default); Calendar.weekday: 1=Sun, 2=Mon … 7=Sat
+    @AppStorage("focusDailyTargetSun") var focusDailyTargetSun: Int = 0
+    @AppStorage("focusDailyTargetMon") var focusDailyTargetMon: Int = 0
+    @AppStorage("focusDailyTargetTue") var focusDailyTargetTue: Int = 0
+    @AppStorage("focusDailyTargetWed") var focusDailyTargetWed: Int = 0
+    @AppStorage("focusDailyTargetThu") var focusDailyTargetThu: Int = 0
+    @AppStorage("focusDailyTargetFri") var focusDailyTargetFri: Int = 0
+    @AppStorage("focusDailyTargetSat") var focusDailyTargetSat: Int = 0
+
     var selectedTheme: AppTheme {
         get { AppTheme(rawValue: selectedThemeRaw) ?? .system }
         set {
@@ -192,10 +201,26 @@ class ThemeManager: ObservableObject {
         }
     }
 
+    var effectiveTodayTargetMinutes: Int {
+        let weekday = Calendar.current.component(.weekday, from: Date())
+        let dayTarget: Int
+        switch weekday {
+        case 1: dayTarget = focusDailyTargetSun
+        case 2: dayTarget = focusDailyTargetMon
+        case 3: dayTarget = focusDailyTargetTue
+        case 4: dayTarget = focusDailyTargetWed
+        case 5: dayTarget = focusDailyTargetThu
+        case 6: dayTarget = focusDailyTargetFri
+        case 7: dayTarget = focusDailyTargetSat
+        default: dayTarget = 0
+        }
+        return dayTarget > 0 ? dayTarget : dailyFocusTargetMinutes
+    }
+
     var todayFocusProgress: Double {
-        guard dailyFocusTargetMinutes > 0 else { return 0 }
-        let targetSeconds = dailyFocusTargetMinutes * 60
-        return Double(todayFocusSeconds) / Double(targetSeconds)
+        let target = effectiveTodayTargetMinutes
+        guard target > 0 else { return 0 }
+        return Double(todayFocusSeconds) / Double(target * 60)
     }
 
     func checkAndResetDailyFocus() {

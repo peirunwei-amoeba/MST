@@ -578,6 +578,7 @@ struct FocusView: View {
         // Track focus stats
         themeManager.focusSessionsCompleted += 1
         themeManager.focusTotalMinutes += totalTimerSeconds / 60
+        totalTimerSeconds = 0  // Prevent resetTimer() from double-reporting this session
 
         // Haptic burst and alarm sound
         UINotificationFeedbackGenerator().notificationOccurred(.success)
