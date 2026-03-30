@@ -166,7 +166,7 @@ struct ConcentricHabitCard<ContextMenu: View>: View {
                 }
                 .contextMenu(menuItems: contextMenu)
             }
-            .frame(width: 110, height: 170)
+            .frame(width: 110)
             .padding(.vertical, 20)
             .padding(.horizontal, 12)
             .background(.ultraThinMaterial)
