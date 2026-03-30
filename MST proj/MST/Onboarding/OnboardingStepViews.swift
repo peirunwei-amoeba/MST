@@ -161,6 +161,7 @@ struct NameStep: View {
                         .textContentType(.name)
                         .autocorrectionDisabled()
 
+                    if !themeManager.stabilityMode {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("AI Assistant Name")
                             .font(.caption.weight(.medium))
@@ -173,6 +174,7 @@ struct NameStep: View {
                             .padding()
                             .glassEffect(.regular, in: .capsule)
                             .autocorrectionDisabled()
+                    }
                     }
                 }
                 .opacity(appeared ? 1 : 0)

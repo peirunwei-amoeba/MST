@@ -57,7 +57,7 @@ struct ContentView: View {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
             }
 
-            if !isOnFocusTab {
+            if !isOnFocusTab && !themeManager.stabilityMode {
                 FloatingAIButton(showAssistant: $showAssistant)
             }
 
@@ -82,7 +82,7 @@ struct ContentView: View {
             }
         }
         .onAppear {
-            if assistantViewModel == nil {
+            if assistantViewModel == nil && !themeManager.stabilityMode {
                 assistantViewModel = AssistantViewModel(
                     modelContext: modelContext,
                     pointsManager: pointsManager,
@@ -92,13 +92,19 @@ struct ContentView: View {
             }
         }
         .onChange(of: showAssistant) { _, isShowing in
-            if isShowing && assistantViewModel == nil {
+            if isShowing && assistantViewModel == nil && !themeManager.stabilityMode {
                 assistantViewModel = AssistantViewModel(
                     modelContext: modelContext,
                     pointsManager: pointsManager,
                     focusTimerBridge: focusTimerBridge,
                     themeManager: themeManager
                 )
+            }
+        }
+        .onChange(of: themeManager.stabilityMode) { _, isOn in
+            if isOn {
+                showAssistant = false
+                assistantViewModel = nil
             }
         }
         .fullScreenCover(isPresented: $showAssistant, onDismiss: {

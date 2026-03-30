@@ -88,7 +88,20 @@ struct SettingsView: View {
                     }
                 }
 
+                // Stability Mode Section
+                Section {
+                    Toggle("Stability Mode", isOn: Binding(
+                        get: { themeManager.stabilityMode },
+                        set: { themeManager.stabilityMode = $0 }
+                    ))
+                } header: {
+                    Text("Features")
+                } footer: {
+                    Text("Disables Apple Intelligence features. Recommended for devices without Apple Intelligence.")
+                }
+
                 // AI Assistant Section
+                if !themeManager.stabilityMode {
                 Section("AI Assistant") {
                     HStack {
                         Label("Assistant Name", systemImage: "sparkles")
@@ -127,6 +140,7 @@ struct SettingsView: View {
                         .foregroundStyle(.primary)
                     }
                 }
+                } // end if !stabilityMode
 
                 // Personal Info Section
                 Section("Personal Info") {
@@ -138,10 +152,12 @@ struct SettingsView: View {
                 }
 
                 // Your Profile Section
+                if !themeManager.stabilityMode {
                 Section("AI Profile") {
                     NavigationLink("View Profile") {
                         ProfileDetailView()
                     }
+                }
                 }
 
                 // Privacy & Permissions Section
