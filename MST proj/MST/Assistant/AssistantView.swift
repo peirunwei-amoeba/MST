@@ -79,7 +79,8 @@ struct AssistantView: View {
                         .mask {
                             LinearGradient(
                                 stops: [
-                                    .init(color: .black, location: 0),
+                                    .init(color: .clear, location: 0.0),
+                                    .init(color: .black, location: 0.06),
                                     .init(color: .black, location: 0.84),
                                     .init(color: .clear, location: 1.0)
                                 ],

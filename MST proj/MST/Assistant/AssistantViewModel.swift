@@ -114,7 +114,8 @@ final class AssistantViewModel {
 
     func saveConversationHistory() {
         let trimmed = Array(messages.filter { !$0.isStreaming }.suffix(Self.maxSavedMessages))
-        let session = ChatSession(id: currentChatId, createdDate: Date(), messages: trimmed)
+        let existingAiTitle = allChatSessions.first(where: { $0.id == currentChatId })?.aiTitle
+        let session = ChatSession(id: currentChatId, createdDate: Date(), messages: trimmed, aiTitle: existingAiTitle)
 
         if let idx = allChatSessions.firstIndex(where: { $0.id == currentChatId }) {
             allChatSessions[idx] = session
@@ -127,6 +128,7 @@ final class AssistantViewModel {
             UserDefaults.standard.set(data, forKey: Self.chatSessionsKey)
         }
         UserDefaults.standard.set(currentChatId.uuidString, forKey: Self.activeChatKey)
+        generateChatTitle(for: currentChatId)
     }
 
     func newChat() {
@@ -159,7 +161,7 @@ final class AssistantViewModel {
     private var systemInstructions: String {
         let agentName = themeManager.assistantName.isEmpty ? "Spark" : themeManager.assistantName
         let userName = themeManager.userName.isEmpty ? "the user" : themeManager.userName
-        return """
+        var base = """
         You are \(agentName), a friendly and concise productivity assistant for \(userName) in the MST app. \
         You help manage assignments, projects, and habits. \
         Keep responses concise and structured — use markdown formatting: **bold**, *italic*, `code`, bullet lists, headers.
@@ -184,6 +186,13 @@ final class AssistantViewModel {
         Format responses clearly with markdown so headings, bold, bullets, and code are all visually distinct.
         \(themeManager.userProfileSummary.isEmpty ? "" : "\nUser profile:\n\(themeManager.userProfileSummary)")
         """
+        if !messages.isEmpty {
+            let history = messages.suffix(40)
+                .map { "\($0.role == .user ? "User" : "Assistant"): \($0.content)" }
+                .joined(separator: "\n")
+            base += "\n\nPrevious conversation context (already happened — do NOT repeat greetings):\n\(history)"
+        }
+        return base
     }
 
     private func createSession() {
@@ -329,6 +338,40 @@ final class AssistantViewModel {
         let name = result.components(separatedBy: "(").first?
             .trimmingCharacters(in: .whitespacesAndNewlines)
         return (CLLocationCoordinate2D(latitude: lat, longitude: lon), name)
+    }
+
+    // MARK: - Chat Title Generation
+
+    private func generateChatTitle(for chatId: UUID) {
+        guard isAvailable else { return }
+        guard let idx = allChatSessions.firstIndex(where: { $0.id == chatId }) else { return }
+        guard allChatSessions[idx].aiTitle == nil else { return }
+        let userMessages = allChatSessions[idx].messages.filter { $0.role == .user }
+        guard userMessages.count >= 2 else { return }
+
+        let transcript = allChatSessions[idx].messages.suffix(20)
+            .map { "\($0.role == .user ? "User" : "Assistant"): \($0.content)" }
+            .joined(separator: "\n")
+
+        Task {
+            do {
+                let titleSession = LanguageModelSession()
+                let prompt = """
+                Summarize this conversation in 4-6 words as a chat title. No quotes, no punctuation at end. Just the title.
+
+                \(transcript)
+                """
+                let response = try await titleSession.respond(to: prompt)
+                let title = String(response.content.trimmingCharacters(in: .whitespacesAndNewlines).prefix(60))
+                await MainActor.run {
+                    guard let i = self.allChatSessions.firstIndex(where: { $0.id == chatId }) else { return }
+                    self.allChatSessions[i].aiTitle = title
+                    if let data = try? JSONEncoder().encode(self.allChatSessions) {
+                        UserDefaults.standard.set(data, forKey: Self.chatSessionsKey)
+                    }
+                }
+            } catch { /* silently fail */ }
+        }
     }
 
     // MARK: - Conversation Summary

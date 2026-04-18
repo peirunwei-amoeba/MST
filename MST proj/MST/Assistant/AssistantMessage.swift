@@ -100,15 +100,18 @@ struct ChatSession: Identifiable, Codable {
     let id: UUID
     var createdDate: Date
     var messages: [AssistantMessage]
+    var aiTitle: String?
 
-    init(id: UUID = UUID(), createdDate: Date = Date(), messages: [AssistantMessage] = []) {
+    init(id: UUID = UUID(), createdDate: Date = Date(), messages: [AssistantMessage] = [], aiTitle: String? = nil) {
         self.id = id
         self.createdDate = createdDate
         self.messages = messages
+        self.aiTitle = aiTitle
     }
 
-    /// Short display title derived from the first user message.
+    /// Display title: prefers AI-generated title, falls back to first user message words.
     var displayTitle: String {
+        if let ai = aiTitle, !ai.isEmpty { return ai }
         if let first = messages.first(where: { $0.role == .user }) {
             let words = first.content.split(separator: " ").prefix(7).joined(separator: " ")
             return words.isEmpty ? formattedDate : words

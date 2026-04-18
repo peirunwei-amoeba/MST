@@ -106,7 +106,8 @@ struct HabitJourneyView: View {
                     .mask {
                         LinearGradient(
                             stops: [
-                                .init(color: .black, location: 0),
+                                .init(color: .clear, location: 0.0),
+                                .init(color: .black, location: 0.06),
                                 .init(color: .black, location: 0.88),
                                 .init(color: .clear, location: 1.0)
                             ],
@@ -608,18 +609,74 @@ private struct JourneyDividerView: View {
 
     var body: some View {
         VStack(spacing: 6) {
-            HStack(spacing: 12) {
-                Rectangle()
-                    .fill(Color.secondary.opacity(0.25))
-                    .frame(height: 1)
+            ZStack {
+                Canvas { context, size in
+                    let midY = size.height / 2
+                    let centerX = size.width / 2
+                    let badgeHalf: CGFloat = 16
+                    let flareSize: CGFloat = 4.0
+                    let diamondSpacing: CGFloat = 18
+                    let diamondSize: CGFloat = 3.5
+                    let dotSize: CGFloat = 1.8
 
+                    let lineShading = GraphicsContext.Shading.color(Color.secondary.opacity(0.2))
+                    let ornStroke = GraphicsContext.Shading.color(style.color.opacity(0.5))
+                    let ornFill = GraphicsContext.Shading.color(style.color.opacity(0.45))
+
+                    let leftEnd = centerX - badgeHalf - flareSize
+                    let rightStart = centerX + badgeHalf + flareSize
+
+                    // Baselines
+                    var lLine = Path()
+                    lLine.move(to: CGPoint(x: 0, y: midY))
+                    lLine.addLine(to: CGPoint(x: leftEnd, y: midY))
+                    var rLine = Path()
+                    rLine.move(to: CGPoint(x: rightStart, y: midY))
+                    rLine.addLine(to: CGPoint(x: size.width, y: midY))
+                    context.stroke(lLine, with: lineShading, lineWidth: 0.5)
+                    context.stroke(rLine, with: lineShading, lineWidth: 0.5)
+
+                    // Flares at ends adjacent to badge
+                    drawFlare(&context, at: CGPoint(x: leftEnd, y: midY), size: flareSize, shading: ornFill)
+                    drawFlare(&context, at: CGPoint(x: rightStart, y: midY), size: flareSize, shading: ornFill)
+
+                    // Left side diamonds + dots
+                    var x: CGFloat = diamondSpacing / 2
+                    var di = 0
+                    while x < leftEnd - 6 {
+                        let nearCenter = (leftEnd - x) < diamondSpacing * 2.5
+                        let mult: CGFloat = nearCenter ? 1.4 : 1.0
+                        drawDiamond(&context, at: CGPoint(x: x, y: midY), size: diamondSize * mult, shading: ornStroke)
+                        if di > 0 {
+                            drawDot(&context, at: CGPoint(x: x - diamondSpacing / 2, y: midY), size: dotSize, shading: ornFill)
+                        }
+                        x += diamondSpacing
+                        di += 1
+                    }
+
+                    // Right side diamonds + dots (mirrored)
+                    var rx: CGFloat = size.width - diamondSpacing / 2
+                    var ri = 0
+                    while rx > rightStart + 6 {
+                        let nearCenter = (rx - rightStart) < diamondSpacing * 2.5
+                        let mult: CGFloat = nearCenter ? 1.4 : 1.0
+                        drawDiamond(&context, at: CGPoint(x: rx, y: midY), size: diamondSize * mult, shading: ornStroke)
+                        if ri > 0 {
+                            drawDot(&context, at: CGPoint(x: rx + diamondSpacing / 2, y: midY), size: dotSize, shading: ornFill)
+                        }
+                        rx -= diamondSpacing
+                        ri += 1
+                    }
+                }
+                .frame(height: 20)
+
+                // Symbol badge
                 Image(systemName: style.sfSymbol)
-                    .font(.system(size: 16))
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(style.color)
-
-                Rectangle()
-                    .fill(Color.secondary.opacity(0.25))
-                    .frame(height: 1)
+                    .frame(width: 24, height: 24)
+                    .background(.ultraThinMaterial, in: Circle())
+                    .overlay(Circle().strokeBorder(style.color.opacity(0.3), lineWidth: 0.5))
             }
 
             Text(style.title)
@@ -628,5 +685,30 @@ private struct JourneyDividerView: View {
                 .foregroundStyle(.secondary)
         }
         .padding(.vertical, 8)
+    }
+
+    private func drawDiamond(_ ctx: inout GraphicsContext, at c: CGPoint, size: CGFloat, shading: GraphicsContext.Shading) {
+        var p = Path()
+        p.move(to: CGPoint(x: c.x, y: c.y - size))
+        p.addLine(to: CGPoint(x: c.x + size, y: c.y))
+        p.addLine(to: CGPoint(x: c.x, y: c.y + size))
+        p.addLine(to: CGPoint(x: c.x - size, y: c.y))
+        p.closeSubpath()
+        ctx.stroke(p, with: shading, lineWidth: 0.75)
+    }
+
+    private func drawDot(_ ctx: inout GraphicsContext, at c: CGPoint, size: CGFloat, shading: GraphicsContext.Shading) {
+        ctx.fill(Path(ellipseIn: CGRect(x: c.x - size / 2, y: c.y - size / 2, width: size, height: size)), with: shading)
+    }
+
+    private func drawFlare(_ ctx: inout GraphicsContext, at c: CGPoint, size: CGFloat, shading: GraphicsContext.Shading) {
+        var h = Path()
+        h.move(to: CGPoint(x: c.x - size, y: c.y))
+        h.addLine(to: CGPoint(x: c.x + size, y: c.y))
+        var v = Path()
+        v.move(to: CGPoint(x: c.x, y: c.y - size * 0.6))
+        v.addLine(to: CGPoint(x: c.x, y: c.y + size * 0.6))
+        ctx.stroke(h, with: shading, lineWidth: 0.75)
+        ctx.stroke(v, with: shading, lineWidth: 0.75)
     }
 }

@@ -29,6 +29,8 @@ final class AmbientMusicEngine {
 
     private var musicEngine: AVAudioEngine?
     private var musicPlayer: AVAudioPlayerNode?
+    private var nextBuffer: AVAudioPCMBuffer?
+    private var isPrerendering = false
 
     private var sfxEngine: AVAudioEngine?
     private var sfxMixer: AVAudioMixerNode?
@@ -54,6 +56,8 @@ final class AmbientMusicEngine {
         musicEngine?.stop()
         musicEngine = nil
         musicPlayer = nil
+        nextBuffer = nil
+        isPrerendering = false
         isPlaying = false
     }
 
@@ -144,14 +148,57 @@ final class AmbientMusicEngine {
         let player = AVAudioPlayerNode()
         eng.attach(player)
         eng.connect(player, to: eng.mainMixerNode, format: buffer.format)
-        eng.mainMixerNode.outputVolume = isMuted ? 0 : volume
+        eng.mainMixerNode.outputVolume = 0  // start silent; fade in via applyMixerFadeIn
 
         do { try eng.start() } catch { isPlaying = false; return }
 
         musicEngine = eng
         musicPlayer = player
-        player.scheduleBuffer(buffer, at: nil, options: .loops)
+        scheduleBufferWithChaining(player: player, buffer: buffer)
         player.play()
+        applyMixerFadeIn(engine: eng, targetVolume: isMuted ? 0 : volume, duration: 3.0)
+        prefetchNextBuffer()
+    }
+
+    private func scheduleBufferWithChaining(player: AVAudioPlayerNode, buffer: AVAudioPCMBuffer) {
+        player.scheduleBuffer(buffer, at: nil, completionCallbackType: .dataPlayedBack) { [weak self] _ in
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.isPlaying, let player = self.musicPlayer else { return }
+                if let next = self.nextBuffer {
+                    self.nextBuffer = nil
+                    self.scheduleBufferWithChaining(player: player, buffer: next)
+                    self.prefetchNextBuffer()
+                } else {
+                    // Fallback: reschedule same buffer seamlessly (no fade-in)
+                    self.scheduleBufferWithChaining(player: player, buffer: buffer)
+                }
+            }
+        }
+    }
+
+    private func prefetchNextBuffer() {
+        guard !isPrerendering else { return }
+        isPrerendering = true
+        Task.detached(priority: .background) { [weak self] in
+            let buf = Self.renderLoopBuffer(sampleRate: 44100)
+            await MainActor.run { [weak self] in
+                guard let self, self.isPlaying else { return }
+                self.nextBuffer = buf
+                self.isPrerendering = false
+            }
+        }
+    }
+
+    private func applyMixerFadeIn(engine: AVAudioEngine, targetVolume: Float, duration: Double) {
+        let steps = 60
+        let stepDuration = duration / Double(steps)
+        var step = 0
+        Timer.scheduledTimer(withTimeInterval: stepDuration, repeats: true) { [weak engine] timer in
+            guard let engine else { timer.invalidate(); return }
+            step += 1
+            engine.mainMixerNode.outputVolume = Float(step) / Float(steps) * targetVolume
+            if step >= steps { timer.invalidate() }
+        }
     }
 
     private func playSFX(_ samples: [Float], sampleRate: Float) {
@@ -300,13 +347,7 @@ final class AmbientMusicEngine {
         applyDelay(into: data, total: numSamples, sampleRate: sampleRate)
         applyCompressor(into: data, total: numSamples)
 
-        let fadeInSamples = Int(3.0 * sampleRate)
-        for i in 0..<numSamples {
-            let masterGain: Float = i < fadeInSamples
-                ? Float(i) / Float(fadeInSamples) * 0.30
-                : 0.30
-            data[i] *= masterGain
-        }
+        for i in 0..<numSamples { data[i] *= 0.30 }
 
         return buffer
     }
