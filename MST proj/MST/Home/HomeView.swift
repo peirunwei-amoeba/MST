@@ -86,7 +86,7 @@ struct HomeView: View {
                     ScrollView {
                         VStack(spacing: 20) {
                             // AI-generated caption — inline below nav title, above habits
-                            if !aiNavSubtitle.isEmpty || isGeneratingTitle {
+                            if !themeManager.stabilityMode && (!aiNavSubtitle.isEmpty || isGeneratingTitle) {
                                 Group {
                                     if !aiNavSubtitle.isEmpty {
                                         Text(aiNavSubtitle)
@@ -116,7 +116,9 @@ struct HomeView: View {
                         titleGenerationTask?.cancel()
                         aiNavTitle = ""
                         aiNavSubtitle = ""
-                        generateAITitle()
+                        if !themeManager.stabilityMode {
+                            generateAITitle()
+                        }
                     }
                     .onChange(of: recentlyCompletedProjectIds) { oldValue, newValue in
                         // When a project completes, scroll to projects section to maintain position
@@ -167,7 +169,11 @@ struct HomeView: View {
             }
             .onAppear {
                 if aiNavTitle.isEmpty && !isGeneratingTitle {
-                    generateAITitle()
+                    if themeManager.stabilityMode {
+                        aiNavTitle = randomFallbackTitle()
+                    } else {
+                        generateAITitle()
+                    }
                 }
                 themeManager.checkAndResetDailyFocus()
             }
@@ -176,6 +182,10 @@ struct HomeView: View {
             }
             .onChange(of: scenePhase) { _, newPhase in
                 if newPhase == .active {
+                    if themeManager.stabilityMode {
+                        if aiNavTitle.isEmpty { aiNavTitle = randomFallbackTitle() }
+                        return
+                    }
                     let stale = aiNavTitle.isEmpty
                     let shouldRefresh: Bool
                     if let lastDate = lastTitleGenerationDate {
@@ -362,7 +372,7 @@ struct HomeView: View {
                                     isRecentlyCompleted: isRecentlyCompleted,
                                     onTap: { selectedHabit = habit },
                                     onToggleComplete: { completeHabitWithAnimation(habit) },
-                                    onJourney: {
+                                    onJourney: themeManager.stabilityMode ? nil : {
                                         journeyStartGenerating = false
                                         journeyHabit = habit
                                     }
@@ -499,7 +509,7 @@ struct HomeView: View {
             }
 
             // Open the Apple Intelligence journey overlay to generate a story paragraph
-            if SystemLanguageModel.default.availability == .available {
+            if !themeManager.stabilityMode && SystemLanguageModel.default.availability == .available {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
                     journeyStartGenerating = true
                     journeyHabit = habit

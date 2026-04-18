@@ -14,6 +14,7 @@
 
 import SwiftUI
 import SwiftData
+import FoundationModels
 
 @main
 struct MSTApp: App {
@@ -21,6 +22,17 @@ struct MSTApp: App {
     @StateObject private var pointsManager = PointsManager()
     @State private var focusTimerBridge = FocusTimerBridge()
     @State private var timerAlarmEngine = TimerAlarmEngine()
+
+    init() {
+        // On first launch, default stability mode based on Apple Intelligence availability.
+        // Devices without AI get stability mode ON; devices with AI get it OFF.
+        let initialized = UserDefaults.standard.bool(forKey: "stabilityModeInitialized")
+        if !initialized {
+            let aiAvailable = SystemLanguageModel.default.availability == .available
+            UserDefaults.standard.set(!aiAvailable, forKey: "stabilityMode")
+            UserDefaults.standard.set(true, forKey: "stabilityModeInitialized")
+        }
+    }
 
     var body: some Scene {
         WindowGroup {
@@ -45,6 +57,7 @@ private struct AppRootView: View {
     var body: some View {
         ContentView()
             .task {
+                guard !themeManager.stabilityMode else { return }
                 let lastScheduled = UserDefaults.standard.object(forKey: "lastEncouragementSchedule") as? Date
                 let shouldSchedule = lastScheduled.map { Calendar.current.isDateInToday($0) == false } ?? true
                 if shouldSchedule {

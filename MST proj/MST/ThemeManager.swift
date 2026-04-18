@@ -127,6 +127,7 @@ class ThemeManager: ObservableObject {
     @AppStorage("userName") var userName: String = ""
     @AppStorage("hasCompletedOnboarding") var hasCompletedOnboarding: Bool = false
     @AppStorage("userProfileSummary") var userProfileSummary: String = ""
+    @AppStorage("stabilityMode") var stabilityMode: Bool = true
     @AppStorage("focusSessionsCompleted") var focusSessionsCompleted: Int = 0
     @AppStorage("focusTotalMinutes") var focusTotalMinutes: Int = 0
 
